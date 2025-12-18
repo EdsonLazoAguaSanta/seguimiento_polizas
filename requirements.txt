@@ -7,3 +7,4 @@ schedule
 fastapi
 uvicorn[standard]
 msal
+pydantic 
