@@ -1,0 +1,12 @@
+.btn-lapiz {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.icono-lapiz {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+}

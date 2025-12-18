@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Clasificación de siniestros{% endblock %}
+
+{% block content %}
+<h1>Clasificación de siniestros</h1>
+
+{% if modo_demo %}
+<p><strong>Modo demo:</strong> No se pudieron leer correos reales, se muestran ejemplos.</p>
+{% endif %}
+
+<h2>Correos por clasificar</h2>
+
+<details open>
+  <summary><strong>Correos por clasificar</strong> ({{ mails|length }})</summary>
+  {% if mails %}
+  <form method="post" action="/siniestros/clasificar">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Remitente</th>
+          <th>Asunto</th>
+          <th>N° de siniestro</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for m in mails %}
+        {% set idx = loop.index0 %}
+        <tr>
+          <td>{{ m.fecha }}</td>
+          <td>{{ m.remitente }}</td>
+          <td>
+            <a href="#"
+               onclick="alert('Más adelante aquí podremos previsualizar el correo completo.'); return false;">
+               {{ m.asunto }}
+            </a>
+            <input type="hidden" name="id_{{ idx }}" value="{{ m.id }}">
+            <input type="hidden" name="asunto_{{ idx }}" value="{{ m.asunto }}">
+          </td>
+          <td>
+            <input type="text"
+                   name="siniestro_{{ idx }}"
+                   value="{{ m.n_siniestro_detectado or '' }}"
+                   style="width: 140px;">
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <button type="submit" class="btn">Guardar clasificación</button>
+  </form>
+  {% else %}
+  <p>No hay correos pendientes de clasificación.</p>
+  {% endif %}
+</details>
+
+<hr>
+
+<h2>Siniestros agrupados (sesión actual)</h2>
+
+{% if agrupado %}
+  {% for numero, lista in agrupado.items() %}
+    <details>
+      <summary><strong>Siniestro N° {{ numero }}</strong> ({{ lista|length }})</summary>
+      <ul>
+        {% for c in lista %}
+          <li>
+            <a href="#"
+               onclick="alert('Aquí en el futuro podemos abrir el correo asociado o su detalle.'); return false;">
+               {{ c.asunto }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% endfor %}
+{% else %}
+<p>Aún no hay siniestros agrupados en esta sesión.</p>
+{% endif %}
+
+{% endblock %}

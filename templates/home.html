@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Seguros Agua Santa{% endblock %}
+
+{% block content %}
+<h1>Gestión de Seguros Agua Santa</h1>
+<p>
+    Plataforma interna para seguimiento de pólizas, siniestros y beneficiarios bancarios.
+</p>
+
+<div class="grid">
+    <div class="card">
+        <h3>Pólizas</h3>
+        <p>Revisión de archivos en carpeta “Pólizas”.</p>
+        <a href="/polizas" class="btn">Ir a Pólizas</a>
+    </div>
+
+    <div class="card">
+        <h3>Siniestros</h3>
+        <p>Listado de los últimos correos enviados/recibidos para control de siniestro.</p>
+        <a href="/siniestros" class="btn">Ver siniestros</a>
+    </div>
+
+    {#<div class="card">
+        <h3>Clasificación de siniestros</h3>
+        <p>Histórico de las conversaciones de cada uno de los siniestros activos.</p>
+        <a href="/siniestros/clasificar" class="btn">Clasificar siniestros</a>
+    </div>#}
+
+    <div class="card">
+        <h3>Bancos</h3>
+        <p>Pólizas con beneficiario Banco e histórico de correos para seguimiento.</p>
+        <a href="/bancos" class="btn">Ver módulo Bancos</a>
+    </div>
+</div>
+{% endblock %}

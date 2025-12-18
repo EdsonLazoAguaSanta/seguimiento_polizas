@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Gestión de Seguros Agua Santa{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --verde: #154734;
+            --verde-oscuro: #0c261b;
+            --gris-claro: #f4f5f7;
+            --gris-medio: #d1d5db;
+            --blanco: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Open Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #222;
+            min-height: 100vh;
+            background: url("/static/img/fondo.jpg") center/cover no-repeat fixed;
+        }
+
+        .page-overlay {
+            min-height: 100vh;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid var(--gris-medio);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .header-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-area img {
+            height: 42px;
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--verde);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 16px;
+            margin: 0;
+            padding: 0;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: #444;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+
+        nav a:hover,
+        nav a.active {
+            background: var(--verde);
+            color: var(--blanco);
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 16px auto 32px auto;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin-top: 0;
+            color: var(--verde-oscuro);
+        }
+
+        h2, h3 {
+            color: var(--verde);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--blanco);
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid var(--gris-medio);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 8px 14px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            border: 1px solid var(--verde);
+            color: var(--verde);
+            background: var(--blanco);
+        }
+
+        .btn:hover {
+            background: var(--verde);
+            color: var(--blanco);
+        }
+
+        details {
+            margin-bottom: 8px;
+            background: var(--gris-claro);
+            border-radius: 6px;
+            padding: 4px 8px;
+        }
+
+        summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--verde-oscuro);
+        }
+
+        footer {
+            max-width: 1100px;
+            margin: 0 auto 16px auto;
+            padding: 0 16px;
+            font-size: 12px;
+            color: #555;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="page-overlay">
+    <header>
+        <div class="header-inner">
+            <div class="logo-area">
+                <img src="/static/img/logo-agua-santa.jpg" alt="Empresas Agua Santa">
+                <div class="logo-text">Gestión de Seguros</div>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Home</a></li>
+                    <li><a href="/polizas" class="{% if request.url.path.startswith('/polizas') %}active{% endif %}">Pólizas</a></li>
+                    <li><a href="/siniestros" class="{% if request.url.path == '/siniestros' %}active{% endif %}">Siniestros</a></li>
+                    {#<li><a href="/siniestros/clasificar" class="{% if request.url.path.startswith('/siniestros/clasificar') %}active{% endif %}">Clasificación de siniestros</a></li>#}
+                    <li><a href="/bancos" class="{% if request.url.path.startswith('/bancos') %}active{% endif %}">Bancos</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        Empresas Agua Santa &mdash; Uso interno · {{ request.url.path }}
+    </footer>
+</div>
+</body>
+</html>

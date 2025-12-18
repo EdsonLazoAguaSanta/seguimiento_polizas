@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Pólizas · Gestión de Seguros Agua Santa{% endblock %}
+
+{% block content %}
+<h1>Pólizas</h1>
+
+<p>Ruta base: {{ ruta_polizas }}</p>
+
+<!-- Documentos nuevos de hoy -->
+{% if nuevos_hoy %}
+    <h2>Documentos nuevos (hoy)</h2>
+    <ul>
+        {% for doc in nuevos_hoy %}
+            <li>
+                {% if doc.carpeta %}
+                    {{ doc.carpeta }} /
+                {% else %}
+                    (Sin carpeta) /
+                {% endif %}
+                <a href="/polizas/view/{{ doc.rel_path }}" target="_blank">
+                    {{ doc.nombre }}
+                </a>
+                – {{ doc.mtime }}
+            </li>
+        {% endfor %}
+    </ul>
+    <hr>
+{% endif %}
+
+<!-- Carpetas desplegables -->
+{% if carpetas %}
+    {% for carpeta, archivos in carpetas.items() %}
+        <details>
+            <summary>
+                {% if carpeta %}
+                    {{ carpeta }}
+                {% else %}
+                    (Sin carpeta)
+                {% endif %}
+                &nbsp; ({{ archivos|length }} documento{{ 's' if archivos|length != 1 }})
+            </summary>
+            <ul>
+                {% for doc in archivos %}
+                    <li>
+                        <a href="/polizas/view/{{ doc.rel_path }}" target="_blank">
+                            {{ doc.nombre }}
+                        </a>
+                        – {{ doc.mtime }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </details>
+    {% endfor %}
+{% else %}
+    <p>No se encontraron archivos PDF en la ruta configurada.</p>
+{% endif %}
+{% endblock %}
