@@ -6,3 +6,4 @@ watchdog
 schedule
 fastapi
 uvicorn[standard]
+msal
