@@ -4,3 +4,6 @@ requests
 python-dotenv
 watchdog
 schedule
+fastapi
+uvicorn[standard]
+
