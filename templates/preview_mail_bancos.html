@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Vista correo Bancos{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Vista previa correo Bancos</h2>
+  <p><strong>Asunto:</strong> {{ mail.asunto }}</p>
+  <p><strong>Remitente:</strong> {{ mail.remitente }}</p>
+  <p><strong>Fecha:</strong> {{ mail.fecha }}</p>
+
+  <hr>
+
+  <div>
+    {{ mail.body_html | safe }}
+  </div>
+</div>
+{% endblock %}
