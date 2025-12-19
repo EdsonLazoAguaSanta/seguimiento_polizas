@@ -1,4 +1,16 @@
 from pathlib import Path
+import os
+import msal
+import requests
+from typing import List, Optional
+
+from fastapi import FastAPI, Request, Form, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+
+
+from pathlib import Path
 from typing import List, Optional
 
 import json
@@ -15,6 +27,20 @@ from fastapi import FastAPI, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+# === CONFIGURACIÓN MSAL / GRAPH ===
+TENANT_ID = os.getenv("TENANT_ID")
+CLIENT_ID = os.getenv("CLIENT_ID")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+
+GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
+
+SHAREPOINT_HOST = "servicioscruzdelsur.sharepoint.com"
+SHAREPOINT_SITE_PATH = "/sites/Gestion"
+
+# Carpeta de pólizas y bancos en la biblioteca "Documentos compartidos"
+POLIZAS_FOLDER_PATH = "/Seguros/Pólizas"
+BANCOS_FOLDER_PATH = "/Seguros/Pólizas"
 
 # ---------------------------------------------------------------------
 # Cargar .env
@@ -152,6 +178,154 @@ def guardar_clasificacion_siniestros(mapa: dict[str, str]) -> None:
     except Exception as e:
         print("[SINIESTROS] Error al guardar clasificacion:", e)
 
+def get_graph_token() -> str:
+    """Obtiene un token de aplicación para Microsoft Graph."""
+    app = msal.ConfidentialClientApplication(
+        client_id=CLIENT_ID,
+        authority=f"https://login.microsoftonline.com/{TENANT_ID}",
+        client_credential=CLIENT_SECRET,
+    )
+    result = app.acquire_token_for_client(scopes=GRAPH_SCOPE)
+    if "access_token" not in result:
+        raise RuntimeError(f"No se pudo obtener token de Graph: {result}")
+    return result["access_token"]
+
+
+def get_sharepoint_site_and_drive():
+    """
+    Devuelve (site_id, drive_id) del sitio /sites/Gestion y la biblioteca
+    'Documentos compartidos'.
+    """
+    token = get_graph_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1) Resolver el sitio
+    site_url = f"https://graph.microsoft.com/v1.0/sites/{SHAREPOINT_HOST}:{SHAREPOINT_SITE_PATH}"
+    resp_site = requests.get(site_url, headers=headers)
+    resp_site.raise_for_status()
+    site_id = resp_site.json()["id"]
+
+    # 2) Encontrar el drive de documentos
+    drives_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
+    resp_drives = requests.get(drives_url, headers=headers)
+    resp_drives.raise_for_status()
+    drives = resp_drives.json().get("value", [])
+
+    drive_id = None
+    for d in drives:
+        print("[DEBUG] Drive:", d.get("name"), d.get("id"))
+        nombre = (d.get("name") or "").lower()
+        # aquí usamos el nombre que te muestra el error: 'Documentos'
+        if "documentos" in nombre:
+            drive_id = d.get("id")
+            break
+
+    if not drive_id:
+        raise RuntimeError(
+            f"No se encontró el drive de documentos en el sitio de SharePoint. "
+            f"Drives encontrados: {[d.get('name') for d in drives]}"
+        )
+
+    return site_id, drive_id
+
+
+
+from datetime import datetime
+
+def get_sharepoint_folder_tree(folder_path: str):
+    """
+    Lee una carpeta de SharePoint (por ej. /Seguros/Pólizas) de forma recursiva
+    y devuelve una lista de carpetas con sus archivos PDF filtrados:
+      - nombre contiene 'póliza'
+      - año actual o año anterior
+    """
+    token = get_graph_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    _, drive_id = get_sharepoint_site_and_drive()
+
+    # Carpeta raíz (ej /Seguros/Pólizas)
+    folder_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:{folder_path}"
+    resp_folder = requests.get(folder_url, headers=headers)
+    resp_folder.raise_for_status()
+    root = resp_folder.json()
+    root_id = root["id"]
+
+    year_now = datetime.utcnow().year
+    years_validos = {year_now, year_now - 1}
+
+    def listar_recursivo(item_id: str, nombre_carpeta: str, acumulador: dict):
+        """
+        Recorre una carpeta y sus subcarpetas, acumulando archivos por
+        'nombre_carpeta' (clave de primer nivel).
+        """
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}/children"
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        items = resp.json().get("value", [])
+
+        for it in items:
+            # Si es subcarpeta, seguimos recursivamente
+            if "folder" in it:
+                sub_id = it["id"]
+                sub_name = it["name"]
+                # Usamos el nombre de la carpeta de primer nivel como agrupador
+                if nombre_carpeta is None:
+                    agrupador = sub_name
+                else:
+                    agrupador = nombre_carpeta
+                listar_recursivo(sub_id, agrupador, acumulador)
+            # Si es archivo
+            elif "file" in it:
+                nombre_archivo = it.get("name", "")
+                if not nombre_archivo.lower().endswith(".pdf"):
+                    continue
+                # debe contener "póliza" en el nombre
+                if "póliza" not in nombre_archivo.lower() and "poliza" not in nombre_archivo.lower():
+                    continue
+
+                # año de modificación
+                fecha_str = it.get("lastModifiedDateTime")
+                try:
+                    fecha_dt = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+                    if fecha_dt.year not in years_validos:
+                        continue
+                except Exception:
+                    # si no se puede parsear la fecha, se descarta
+                    continue
+
+                download_url = it.get("@microsoft.graph.downloadUrl")
+                # agrupamos por nombre_carpeta de primer nivel
+                carpeta_key = nombre_carpeta or "Otros"
+
+                acumulador.setdefault(carpeta_key, []).append(
+                    {
+                        "nombre": nombre_archivo,
+                        "url": download_url,
+                        "fecha": fecha_dt.strftime("%Y-%m-%d %H:%M"),
+                    }
+                )
+
+    # acumulador: { "Aas": [archivos...], "Acar": [archivos...] }
+    acumulador: dict[str, list[dict]] = {}
+    # empezamos en la raíz; nombre_carpeta None porque aún no sabemos
+    listar_recursivo(root_id, None, acumulador)
+
+    # Convertir a la estructura que esperan los templates
+    resultado = []
+    for carpeta, archivos in acumulador.items():
+        archivos_ordenados = sorted(archivos, key=lambda x: x["nombre"].lower())
+        resultado.append(
+            {
+                "carpeta": carpeta,
+                "cantidad": len(archivos_ordenados),
+                "archivos": archivos_ordenados,
+            }
+        )
+
+    resultado.sort(key=lambda x: x["carpeta"].lower())
+    return resultado
+
 
 # ---------------------------------------------------------------------
 # Utilidades Microsoft Graph (correo)
@@ -271,23 +445,20 @@ def guardar_clasificacion_siniestros(mapa: dict[str, str]) -> None:
 CLASIF_SINIESTROS_MAIL = cargar_clasificacion_siniestros()
 
 
-def leer_correos_bancos(max_mails: int = 50):
+def leer_correos_bancos(max_mails: int = 50) -> list[dict]:
     """Lee correos desde la subcarpeta 'Bancos' de la Bandeja de entrada."""
     mails: list[dict] = []
 
     token = get_graph_token()
-    if not token:
-        return mails
-
     headers = {"Authorization": f"Bearer {token}"}
-    base_url = "https://graph.microsoft.com/v1.0"
+    baseurl = "https://graph.microsoft.com/v1.0"
     user = GRAPH_USER or "me"
 
-    # Buscar carpeta "Bancos" dentro de Inbox
+    # buscar subcarpeta Bancos dentro de Inbox
     resp = requests.get(
-        f"{base_url}/users/{user}/mailFolders/inbox/childFolders",
+        f"{baseurl}/users/{user}/mailFolders/inbox/childFolders",
         headers=headers,
-        params={"$top": 200},
+        params={"top": 200},
         timeout=15,
     )
     if resp.status_code != 200:
@@ -302,17 +473,17 @@ def leer_correos_bancos(max_mails: int = 50):
             break
 
     if folder_id is None:
-        print(f"[GRAPH] Carpeta '{GRAPH_BANKS_FOLDER_DISPLAY_NAME}' no encontrada en Inbox.")
+        print(f"[GRAPH] Carpeta {GRAPH_BANKS_FOLDER_DISPLAY_NAME} no encontrada en Inbox.")
         return mails
 
-    # Leer correos de esa carpeta
+    # leer mensajes de esa carpeta
     resp = requests.get(
-        f"{base_url}/users/{user}/mailFolders/{folder_id}/messages",
+        f"{baseurl}/users/{user}/mailFolders/{folder_id}/messages",
         headers=headers,
         params={
-            "$top": max_mails,
-            "$select": "subject,from,receivedDateTime",
-            "$orderby": "receivedDateTime desc",
+            "top": max_mails,
+            "select": "subject,from,receivedDateTime",
+            "orderby": "receivedDateTime desc",
         },
         timeout=15,
     )
@@ -321,24 +492,16 @@ def leer_correos_bancos(max_mails: int = 50):
         return mails
 
     for item in resp.json().get("value", []):
-        remitente = (
-            item.get("from", {})
-            .get("emailAddress", {})
-            .get("address", "")
-        )
-        asunto = item.get("subject", "")
-        fecha = item.get("receivedDateTime", "")
-        mail_id = item.get("id", "")
+        remitente = item.get("from", {}).get("emailAddress", {}).get("address")
+        asunto = item.get("subject")
+        fecha = item.get("receivedDateTime")
+        mail_id = item.get("id")
         mails.append(
-            {
-                "id": mail_id,
-                "fecha": fecha,
-                "remitente": remitente,
-                "asunto": asunto,
-            }
+            {"id": mail_id, "fecha": fecha, "remitente": remitente, "asunto": asunto}
         )
 
     return mails
+
 
 
 def detectar_numero_siniestro(asunto: str) -> str | None:
@@ -381,6 +544,25 @@ async def home(request: Request):
         "home.html",
         {
             "request": request,
+        },
+    )
+
+@app.get("/polizas", response_class=HTMLResponse)
+async def polizas(request: Request):
+    try:
+        polizas = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
+        mensaje = "" if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
+    except Exception as e:
+        polizas = []
+        mensaje = f"Error al leer pólizas desde SharePoint: {e}"
+
+    return templates.TemplateResponse(
+        "polizas.html",
+        {
+            "request": request,
+            "polizas": polizas,
+            "ruta_base": f"SharePoint: {POLIZAS_FOLDER_PATH}",
+            "mensaje": mensaje,
         },
     )
 
@@ -647,33 +829,80 @@ async def guardar_clasificacion(request: Request):
         status_code=303,
     )
 
+@app.get("/bancos", response_class=HTMLResponse)
+async def bancos(request: Request):
+    polizas_data = []
+    correos_bancos = []
+    mensaje = None
 
+    # 1) Pólizas desde SharePoint (no dependen del correo)
+    try:
+        polizas_data = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
+    except Exception as e:
+        mensaje = f"Error al cargar pólizas: {e}"
+
+    # 2) Correos desde IMAP (si falla, sólo afecta la sección de correos)
+    try:
+        from test_imap_folders import get_emails_from_subfolder
+        correos_bancos = get_emails_from_subfolder("Bancos")
+    except Exception as e:
+        # no romper la página: solo informar
+        if mensaje:
+            mensaje += f" | Error al cargar correos: {e}"
+        else:
+            mensaje = f"Error al cargar correos: {e}"
+
+    return templates.TemplateResponse(
+        "bancos.html",
+        {
+            "request": request,
+            "polizas": polizas_data,
+            "correos": correos_bancos,
+            "mensaje": mensaje,
+            "ruta_base": POLIZAS_FOLDER_PATH,
+        },
+    )
+
+
+# -------------------------------
+# GET /bancos  (vista inicial)
+# -------------------------------
+from datetime import datetime
+
+from datetime import datetime
+from typing import Optional
 
 @app.get("/bancos", response_class=HTMLResponse)
 async def pagina_bancos(request: Request):
-    # Listado completo de PDFs
-    carpetas_completas = listar_pdfs_por_carpeta()
+    try:
+        # mismas pólizas que en /polizas (desde disco local)
+        carpetas_completas = listar_pdfs_por_carpeta()
 
-    # Año en curso
-    anio_actual = datetime.now().year  # [web:136][web:142]
+        # filtrar: año actual y nombre que contenga "poliza"
+        anio_actual = datetime.now().year
+        carpetas_filtradas: dict[str, list[dict]] = {}
+        for carpeta, archivos in carpetas_completas.items():
+            filtrados = [
+                doc
+                for doc in archivos
+                if doc["mtime_date"].year == anio_actual
+                and "poliza" in doc["nombre"].lower()
+            ]
+            if filtrados:
+                carpetas_filtradas[carpeta] = filtrados
 
-    # Filtrar por año actual y nombre que contenga "Póliza"
-    carpetas_filtradas: dict[str, list[dict]] = {}
-    for carpeta, archivos in carpetas_completas.items():
-        filtrados = [
-            doc
-            for doc in archivos
-            if doc["mtime_date"].year == anio_actual
-            and "póliza" in doc["nombre"].lower()
-        ]
-        if filtrados:
-            carpetas_filtradas[carpeta] = filtrados
+        # correos de la subcarpeta Bancos vía Graph
+        mails_bancos = leer_correos_bancos(max_mails=50)
 
-    # Leer correos nuevos desde carpeta Outlook "Bancos"
-    mails_bancos = leer_correos_bancos(max_mails=50)
+        # subcarpetas disponibles para asignar correos
+        subcarpetas_polizas = listar_subcarpetas_polizas()
 
-    # Lista de subcarpetas de pólizas para las opciones de clasificación
-    subcarpetas_polizas = listar_subcarpetas_polizas()
+        mensaje = None
+    except Exception as e:
+        carpetas_filtradas = {}
+        mails_bancos = []
+        subcarpetas_polizas = []
+        mensaje = f"Error al cargar bancos: {e}"
 
     return templates.TemplateResponse(
         "bancos.html",
@@ -684,10 +913,16 @@ async def pagina_bancos(request: Request):
             "mails_bancos": mails_bancos,
             "subcarpetas_polizas": subcarpetas_polizas,
             "correos_bancos_clasificados": CORREOS_BANCOS_CLASIFICADOS,
+            "mensaje": mensaje,
+            "ruta_polizas": str(RUTA_POLIZAS),
         },
     )
 
 
+
+# -------------------------------
+# POST /bancos  (proceso manual)
+# -------------------------------
 @app.post("/bancos", response_class=HTMLResponse)
 async def clasificar_bancos(
     request: Request,
@@ -713,10 +948,8 @@ async def clasificar_bancos(
     # 2) Limpiar clasificación anterior de correos y reconstruir
     CORREOS_BANCOS_CLASIFICADOS = {}
 
-    # Para evitar leer mails muchas veces, cachea la lista una vez
     mails_bancos = leer_correos_bancos(max_mails=50)
 
-    # n mails, cada mail_id[i] corresponde a mail_carpeta[i]
     for mid, carpeta_destino in zip(mail_id, mail_carpeta):
         carpeta_destino = (carpeta_destino or "").strip()
         if not carpeta_destino:
@@ -728,17 +961,16 @@ async def clasificar_bancos(
 
         CORREOS_BANCOS_CLASIFICADOS.setdefault(carpeta_destino, []).append(info)
 
-    # 3) Volver a armar listado de PDFs filtrados (solo los marcados)
+    # reconstruir listado de pólizas, pero solo las marcadas
     carpetas_completas = listar_pdfs_por_carpeta()
     anio_actual = datetime.now().year
-
     carpetas_filtradas: dict[str, list[dict]] = {}
     for carpeta, archivos in carpetas_completas.items():
         filtrados = [
             doc
             for doc in archivos
             if doc["mtime_date"].year == anio_actual
-            and "póliza" in doc["nombre"].lower()
+            and "poliza" in doc["nombre"].lower()
             and doc["rel_path"] in POLIZAS_BENEF_BANCO
         ]
         if filtrados:
@@ -752,8 +984,11 @@ async def clasificar_bancos(
             "request": request,
             "carpetas": carpetas_filtradas,
             "polizas_benef_banco": POLIZAS_BENEF_BANCO,
-            "mails_bancos": [],  # tras clasificar, ya no se muestran como "nuevos"
+            "mails_bancos": [],  # tras clasificar, ya no se muestran como nuevos
             "subcarpetas_polizas": subcarpetas_polizas,
             "correos_bancos_clasificados": CORREOS_BANCOS_CLASIFICADOS,
+            "ruta_polizas": str(RUTA_POLIZAS),
+            "mensaje": None,
         },
     )
+
