@@ -5,40 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{% endblock %} - Gestión de Seguros</title>
 
-    <!-- Mismos estilos que usas en base.html -->
+    <!-- Bootstrap + tus estilos -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
       rel="stylesheet"
     >
-    <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}">
+    <style>
+      body {
+        /* Fondo con imagen difuminada */
+        background: url("{{ url_for('static', path='img/fondo.jpg') }}") center center fixed no-repeat;
+        background-size: cover;
+      }
+
+      /* Capa blanca encima del fondo para lograr ~40% de opacidad */
+      .bg-overlay {
+        background-color: rgba(255, 255, 255, 0.6);
+        min-height: 100vh;
+      }
+
+      .brand-title {
+        color: #154734; /* color encabezado marca */
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+    </style>
   </head>
-  <body class="bg-light">
+  <body>
+    <div class="bg-overlay d-flex flex-column">
 
-    <!-- Header con logo y fondo, pero SIN navbar de Home/Pólizas/Siniestros/Bancos -->
-    <header>
-      <nav class="navbar navbar-light bg-white border-bottom">
-        <div class="container d-flex align-items-center">
-          <a class="navbar-brand d-flex align-items-center" href="#">
-            <img src="{{ url_for('static', path='img/logo.png') }}" alt="Logo" height="40" class="me-2">
-            <span class="fw-bold text-success">GESTIÓN DE SEGUROS</span>
-          </a>
+      <!-- Header con logo, sin menú -->
+      <header class="border-bottom bg-white bg-opacity-75">
+        <div class="container py-2 d-flex align-items-center">
+          <img
+            src="{{ url_for('static', path='img/logo-agua-santa.jpg') }}"
+            alt="Logo Agua Santa"
+            height="40"
+            class="me-2"
+          >
+          <span class="brand-title">GESTIÓN DE SEGUROS</span>
         </div>
-      </nav>
-      <!-- Si en base.html tienes alguna imagen de fondo en el header,
-           déjala aplicada vía CSS (por ejemplo en body o en un div wrapper).
-           No hace falta repetirla aquí, los mismos estilos se aplican. -->
-    </header>
+      </header>
 
-    <main class="container-fluid p-0">
-      <!-- Contenedor central igual que en base.html -->
-      <div class="container my-4">
-        {% block content %}{% endblock %}
-      </div>
-    </main>
+      <!-- Contenido principal -->
+      <main class="flex-grow-1">
+        <div class="container my-4">
+          {% block content %}{% endblock %}
+        </div>
+      </main>
 
-    <footer class="text-center text-muted small py-3 border-top bg-white">
-      Empresas Agua Santa — Uso interno
-    </footer>
+      <!-- Footer -->
+      <footer class="text-center text-muted small py-3 border-top bg-white bg-opacity-75 mt-auto">
+        Empresas Agua Santa — Uso interno
+      </footer>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   </body>
