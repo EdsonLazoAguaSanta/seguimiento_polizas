@@ -549,6 +549,29 @@ async def pagina_polizas(request: Request):
         },
     )
 
+@app.get("/polizas_publicas", response_class=HTMLResponse)
+async def pagina_polizas_publicas(request: Request):
+    """
+    Versión pública: reutiliza la misma lógica de /polizas,
+    pero renderiza el template polizas_publica.html
+    (que extiende base_polizas_publica.html sin menú).
+    """
+    try:
+        polizas = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
+        mensaje = "" if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
+    except Exception as e:
+        polizas = []
+        mensaje = f"Error al leer pólizas desde SharePoint: {e}"
+
+    return templates.TemplateResponse(
+        "polizas_publica.html",
+        {
+            "request": request,
+            "polizas": polizas,  # árbol desde SharePoint
+            "ruta_base": f"SharePoint: {POLIZAS_FOLDER_PATH}",
+            "mensaje": mensaje,
+        },
+    )
 
 
 @app.get("/siniestros", response_class=HTMLResponse)
@@ -1107,4 +1130,3 @@ async def ver_mail_bancos(request: Request, mail_id: str):
             "mail": mail,
         },
     )
-
