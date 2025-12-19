@@ -3,9 +3,11 @@
 {% block title %}Pólizas{% endblock %}
 
 {% block content %}
-<h1 class="mb-3">Pólizas</h1>
+<h1 class="mb-3" style="color: #0c261b; font-size: 2.2rem;">
+  Pólizas
+</h1>
 
-<p class="text-muted">
+<p class="mb-3" style="color: #154734;">
   Origen: SharePoint: {{ ruta_base }}
 </p>
 
@@ -13,12 +15,14 @@
   <div class="alert alert-warning mt-3">{{ mensaje }}</div>
 {% endif %}
 
-<h2 class="h4 mt-4 mb-3">Listado por carpetas</h2>
+<h2 class="h4 mt-4 mb-3" style="color: #0c261b;">
+  Listado por carpetas
+</h2>
 
 {% if polizas %}
   {% for carpeta in polizas %}
     <details class="mb-2">
-      <summary>{{ carpeta.carpeta }} ({{ carpeta.cantidad }})</summary>
+      <summary><strong>{{ carpeta.carpeta }} ({{ carpeta.cantidad }})</strong></summary>
       <ul class="mt-2">
         {% for doc in carpeta.archivos %}
           <li>
