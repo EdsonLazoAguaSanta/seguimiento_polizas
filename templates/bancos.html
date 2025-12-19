@@ -71,7 +71,12 @@
       <input type="hidden" name="origen" value="mails">
       {% for mail in mails_pendientes %}
         <div class="mb-2 border rounded p-2">
-          <div><strong>{{ mail.asunto }}</strong></div>
+          <div>
+            ✉️
+            <a href="{{ url_for('ver_mail_bancos', mail_id=mail.id) }}" target="_blank">
+              <strong>{{ mail.asunto }}</strong>
+            </a>
+          </div>
           <div class="text-muted">
             {{ mail.remitente }} – {{ mail.fecha }}
           </div>
@@ -111,6 +116,7 @@
       {% for m in mails %}
         {% set _ = clasificados_por_carpeta[carpeta].append({
           'tipo': 'correo',
+          'id': m.id,
           'asunto': m.asunto,
           'remitente': m.remitente,
           'fecha': m.fecha
@@ -145,7 +151,13 @@
             {% if archivo.tipo == 'pdf' %}
               <li>📄 <strong>PDF:</strong> {{ archivo.nombre }}</li>
             {% else %}
-              <li>✉️ <strong>{{ archivo.asunto }}</strong> — {{ archivo.remitente }} ({{ archivo.fecha }})</li>
+              <li>
+                ✉️
+                <a href="{{ url_for('ver_mail_bancos', mail_id=archivo.id) }}" target="_blank">
+                  <strong>{{ archivo.asunto }}</strong>
+                </a>
+                — {{ archivo.remitente }} ({{ archivo.fecha }})
+              </li>
             {% endif %}
           {% endfor %}
         </ul>
@@ -156,4 +168,3 @@
   {% endif %}
 </div>
 {% endblock %}
-
