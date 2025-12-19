@@ -10,6 +10,7 @@
     <div class="alert alert-warning">{{ mensaje }}</div>
   {% endif %}
 
+  <!-- Bloque: selección de pólizas con banco beneficiario -->
   <h2 class="h4 mt-4 mb-3">Seleccionar pólizas con banco beneficiario</h2>
   {% if carpetas %}
     <form method="post" action="/bancos">
@@ -21,7 +22,12 @@
             {% for doc in archivos %}
               <li>
                 <label>
-                  <input type="checkbox" name="seleccion" value="{{ doc.nombre }}">
+                  <input
+                    type="checkbox"
+                    name="seleccion"
+                    value="{{ doc.nombre }}"
+                    {% if polizas_benef_banco and (doc.nombre in polizas_benef_banco) %}checked{% endif %}
+                  >
                   {{ doc.nombre }}
                 </label>
               </li>
@@ -37,11 +43,33 @@
     <div class="alert alert-info">No hay pólizas para mostrar.</div>
   {% endif %}
 
+  <!-- Bloque: correos en carpeta Bancos (solo pendientes) -->
   <h2 class="h4 mt-5 mb-3">Correos en carpeta Bancos</h2>
-  {% if mails_bancos %}
+
+  {# IDs de correos ya clasificados #}
+  {% set ids_clasificados = [] %}
+  {% if correos_bancos_clasificados %}
+    {% for carpeta, mails in correos_bancos_clasificados.items() %}
+      {% for m in mails %}
+        {% if m.id is defined %}
+          {% set _ = ids_clasificados.append(m.id) %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+
+  {# Lista de correos pendientes (no clasificados aún) #}
+  {% set mails_pendientes = [] %}
+  {% for mail in mails_bancos %}
+    {% if mail.id not in ids_clasificados %}
+      {% set _ = mails_pendientes.append(mail) %}
+    {% endif %}
+  {% endfor %}
+
+  {% if mails_pendientes %}
     <form method="post" action="/bancos">
       <input type="hidden" name="origen" value="mails">
-      {% for mail in mails_bancos %}
+      {% for mail in mails_pendientes %}
         <div class="mb-2 border rounded p-2">
           <div><strong>{{ mail.asunto }}</strong></div>
           <div class="text-muted">
@@ -49,13 +77,13 @@
           </div>
           <div class="mt-2">
             <label>Subcarpeta pólizas:</label>
-            <select name="mailcarpeta">
-                        <option value="">-- sin asignar --</option>
+            <select name="mail_carpeta">
+              <option value="">-- sin asignar --</option>
               {% for sub in subcarpetas_polizas %}
                 <option value="{{ sub }}">{{ sub }}</option>
               {% endfor %}
             </select>
-            <input type="hidden" name="mailid" value="{{ mail.id }}">
+            <input type="hidden" name="mail_id" value="{{ mail.id }}">
           </div>
         </div>
       {% endfor %}
@@ -65,10 +93,67 @@
     </form>
   {% else %}
     <div class="alert alert-info">
-      No se encontraron correos en la carpeta Bancos.
+      No hay correos pendientes de clasificar.
     </div>
+  {% endif %}
+
+  <!-- Bloque: Clasificados (PDFs + Correos) -->
+  <h2 class="h5 mt-5 mb-3">Clasificados</h2>
+
+  {% set clasificados_por_carpeta = {} %}
+
+  {# Correos clasificados #}
+  {% if correos_bancos_clasificados %}
+    {% for carpeta, mails in correos_bancos_clasificados.items() %}
+      {% if clasificados_por_carpeta.get(carpeta) is none %}
+        {% set _ = clasificados_por_carpeta.update({carpeta: []}) %}
+      {% endif %}
+      {% for m in mails %}
+        {% set _ = clasificados_por_carpeta[carpeta].append({
+          'tipo': 'correo',
+          'asunto': m.asunto,
+          'remitente': m.remitente,
+          'fecha': m.fecha
+        }) %}
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+
+  {# PDFs clasificados (polizas_benef_banco es una lista de nombres) #}
+  {% if polizas_benef_banco and carpetas %}
+    {% for carpeta, archivos in carpetas.items() %}
+      {% for doc in archivos %}
+        {% if doc.nombre in polizas_benef_banco %}
+          {% if clasificados_por_carpeta.get(carpeta) is none %}
+            {% set _ = clasificados_por_carpeta.update({carpeta: []}) %}
+          {% endif %}
+          {% set _ = clasificados_por_carpeta[carpeta].append({
+            'tipo': 'pdf',
+            'nombre': doc.nombre
+          }) %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+
+  {% if clasificados_por_carpeta %}
+    {% for carpeta, archivos in clasificados_por_carpeta.items() %}
+      <details class="mb-2">
+        <summary>{{ carpeta }} ({{ archivos|length }})</summary>
+        <ul class="mt-2">
+          {% for archivo in archivos %}
+            {% if archivo.tipo == 'pdf' %}
+              <li>📄 <strong>PDF:</strong> {{ archivo.nombre }}</li>
+            {% else %}
+              <li>✉️ <strong>{{ archivo.asunto }}</strong> — {{ archivo.remitente }} ({{ archivo.fecha }})</li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      </details>
+    {% endfor %}
+  {% else %}
+    <div class="text-muted">Aún no hay archivos clasificados.</div>
   {% endif %}
 </div>
 {% endblock %}
-
 
