@@ -1,32 +1,37 @@
-{% extends "base_polizas_publica.html" %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{% endblock %} - Gestión de Seguros</title>
 
-{% block title %}Pólizas{% endblock %}
+    <!-- MISMO CSS QUE EN base.html -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}">
+  </head>
+  <body class="bg-light">
 
-{% block content %}
+    <!-- Encabezado SIN menú -->
+    <nav class="navbar navbar-light bg-white border-bottom">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="#">
+          <img src="{{ url_for('static', path='img/logo.png') }}" alt="Logo" height="40" class="me-2">
+          <span class="fw-bold text-success">GESTIÓN DE SEGUROS</span>
+        </a>
+      </div>
+    </nav>
 
-Origen: SharePoint: {{ ruta_base }}
+    <main class="container my-4">
+      {% block content %}{% endblock %}
+    </main>
 
-{% if mensaje %}
-  <div class="alert alert-warning mt-3">{{ mensaje }}</div>
-{% endif %}
+    <footer class="text-center text-muted small py-3 border-top bg-white">
+      Empresas Agua Santa — Uso interno
+    </footer>
 
-<h2 class="h4 mt-4 mb-3">Listado por carpetas</h2>
-
-{% if polizas %}
-  {% for carpeta in polizas %}
-    <details class="mb-2">
-      <summary>{{ carpeta.carpeta }} ({{ carpeta.cantidad }})</summary>
-      <ul class="mt-2">
-        {% for doc in carpeta.archivos %}
-          <li>{{ doc.nombre }} — <span class="text-muted">{{ doc.fecha }}</span></li>
-        {% endfor %}
-      </ul>
-    </details>
-  {% endfor %}
-{% else %}
-  <div class="alert alert-info mt-3">
-    No hay archivos en esta carpeta.
-  </div>
-{% endif %}
-
-{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
