@@ -800,7 +800,6 @@ CORREOS_BANCOS_CLASIFICADOS: dict[str, list[dict]] = cargar_clasificacion_bancos
 def leer_correos_bancos(max_mails: int = 50) -> list[dict]:
     """Lee correos desde la subcarpeta Bancos de la Bandeja de entrada."""
     mails: list[dict] = []
-
     token = get_graph_token()
     if not token:
         return mails
@@ -826,7 +825,6 @@ def leer_correos_bancos(max_mails: int = 50) -> list[dict]:
         if f.get("displayName") == GRAPH_BANKS_FOLDER_DISPLAY_NAME:
             folder_id = f.get("id")
             break
-
     if folder_id is None:
         print(f"[GRAPH] Carpeta {GRAPH_BANKS_FOLDER_DISPLAY_NAME} no encontrada en Inbox.")
         return mails
@@ -837,7 +835,7 @@ def leer_correos_bancos(max_mails: int = 50) -> list[dict]:
         headers=headers,
         params={
             "$top": max_mails,
-            "$select": "subject,from,receivedDateTime",
+            "$select": "id,subject,from,receivedDateTime",
             "$orderby": "receivedDateTime desc",
         },
         timeout=15,
@@ -861,8 +859,72 @@ def leer_correos_bancos(max_mails: int = 50) -> list[dict]:
                 "asunto": item.get("subject"),
             }
         )
-
     return mails
+
+def leer_correo_bancos_por_id(mail_id: str) -> dict | None:
+    """
+    Devuelve un correo de la carpeta Bancos con body HTML, o None si no existe.
+    """
+    token = get_graph_token()
+    if not token:
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Prefer": 'outlook.body-content-type="html"',
+    }
+    base_url = "https://graph.microsoft.com/v1.0/"
+    user = GRAPH_USER or "me"
+
+    # 1) localizar la carpeta Bancos (igual que antes)
+    resp = requests.get(
+    f"{base_url}users/{user}/messages/{mail_id}",
+    headers=headers,
+    params={"$select": "id,subject,from,receivedDateTime,body"},
+    timeout=15,
+    )
+
+    if resp.status_code != 200:
+        print("[GRAPH] Error al listar carpetas Bancos (body):", resp.status_code, resp.text)
+        return None
+
+    folders = resp.json().get("value", [])
+    folder_id = None
+    for f in folders:
+        if f.get("displayName") == GRAPH_BANKS_FOLDER_DISPLAY_NAME:
+            folder_id = f.get("id")
+            break
+    if folder_id is None:
+        print(f"[GRAPH] Carpeta {GRAPH_BANKS_FOLDER_DISPLAY_NAME} no encontrada (body).")
+        return None
+
+    # 2) obtener el mensaje concreto
+    resp = requests.get(
+        f"{base_url}users/{user}/mailFolders/{folder_id}/messages/{mail_id}",
+        headers=headers,
+        params={"$select": "id,subject,from,receivedDateTime,body"},
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        print("[GRAPH] Error al leer mensaje Bancos por id:", resp.status_code, resp.text)
+        return None
+
+    item = resp.json()
+    remitente = (
+        item.get("from", {})
+        .get("emailAddress", {})
+        .get("address", "")
+    )
+    body = item.get("body", {})
+    body_content = body.get("content", "")
+
+    return {
+        "id": item.get("id"),
+        "fecha": item.get("receivedDateTime"),
+        "remitente": remitente,
+        "asunto": item.get("subject"),
+        "body_html": body_content,
+    }
 
 
 # ------------------------------
@@ -1005,6 +1067,44 @@ async def clasificar_bancos(
             "subcarpetas_polizas": subcarpetas_polizas,
             "correos_bancos_clasificados": CORREOS_BANCOS_CLASIFICADOS,
             "mensaje": mensaje,
+        },
+    )
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
+
+from fastapi import HTTPException
+
+@app.get("/bancos/mail/{mail_id}", name="ver_mail_bancos", response_class=HTMLResponse)
+async def ver_mail_bancos(request: Request, mail_id: str):
+    mails = leer_correos_bancos(max_mails=50)
+    mail = next((m for m in mails if m.get("id") == mail_id), None)
+    if not mail:
+        raise HTTPException(status_code=404, detail="Correo no encontrado")
+
+    return templates.TemplateResponse(
+        "preview_mail_bancos.html",
+        {
+            "request": request,
+            "mail": mail,
+        },
+    )
+
+from fastapi import HTTPException
+
+@app.get("/bancos/mail/{mail_id}", name="ver_mail_bancos", response_class=HTMLResponse)
+async def ver_mail_bancos(request: Request, mail_id: str):
+    mail = leer_correo_bancos_por_id(mail_id)
+    if not mail:
+        raise HTTPException(status_code=404, detail="Correo no encontrado")
+
+    return templates.TemplateResponse(
+        "preview_mail_bancos.html",
+        {
+            "request": request,
+            "mail": mail,
         },
     )
 
