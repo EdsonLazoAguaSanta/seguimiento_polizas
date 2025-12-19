@@ -57,7 +57,7 @@ GRAPH_BANKS_FOLDER_DISPLAY_NAME = os.getenv("GRAPH_BANKS_FOLDER_DISPLAY_NAME", "
 
 # Carpeta de pólizas (misma del watcher)
 RUTA_POLIZAS = Path(
-    r"C:\Users\EdsonLazo\Comercial y Servicios Cruz del Sur\Gestion - Documentos\Seguros\Pólizas"
+    r"/sites/Gestion/Documentos compartidos/Seguros/Pólizas"
 )
 
 # Almacén en memoria para clasificación de siniestros
