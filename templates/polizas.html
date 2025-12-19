@@ -1,58 +1,53 @@
 {% extends "base.html" %}
 
-{% block title %}Pólizas · Gestión de Seguros Agua Santa{% endblock %}
+{% block title %}Pólizas{% endblock %}
 
 {% block content %}
-<h1>Pólizas</h1>
+<div class="container mt-4">
 
-<p>Ruta base: {{ ruta_polizas }}</p>
+  <h1 class="mb-3">Pólizas</h1>
+  <p class="text-muted">Origen: SharePoint: {{ ruta_base }}</p>
 
-<!-- Documentos nuevos de hoy -->
-{% if nuevos_hoy %}
-    <h2>Documentos nuevos (hoy)</h2>
-    <ul>
-        {% for doc in nuevos_hoy %}
-            <li>
-                {% if doc.carpeta %}
-                    {{ doc.carpeta }} /
-                {% else %}
-                    (Sin carpeta) /
-                {% endif %}
-                <a href="/polizas/view/{{ doc.rel_path }}" target="_blank">
-                    {{ doc.nombre }}
-                </a>
-                – {{ doc.mtime }}
-            </li>
-        {% endfor %}
-    </ul>
-    <hr>
-{% endif %}
+  {% if mensaje %}
+    <div class="alert alert-warning">{{ mensaje }}</div>
+  {% endif %}
 
-<!-- Carpetas desplegables -->
-{% if carpetas %}
-    {% for carpeta, archivos in carpetas.items() %}
-        <details>
-            <summary>
-                {% if carpeta %}
-                    {{ carpeta }}
-                {% else %}
-                    (Sin carpeta)
-                {% endif %}
-                &nbsp; ({{ archivos|length }} documento{{ 's' if archivos|length != 1 }})
-            </summary>
-            <ul>
-                {% for doc in archivos %}
-                    <li>
-                        <a href="/polizas/view/{{ doc.rel_path }}" target="_blank">
-                            {{ doc.nombre }}
-                        </a>
-                        – {{ doc.mtime }}
-                    </li>
-                {% endfor %}
+  {% if polizas %}
+    <h2 class="h4 mt-4 mb-3">Listado por carpetas</h2>
+
+    <div class="mb-4">
+      {% for carpeta in polizas %}
+        <details class="mb-2">
+          <summary>
+            {{ carpeta.carpeta }} ({{ carpeta.cantidad }})
+          </summary>
+          {% if carpeta.archivos %}
+            <ul class="mt-2">
+              {% for archivo in carpeta.archivos %}
+                <li>
+                  <a href="{{ archivo.url }}" target="_blank">
+                    {{ archivo.nombre }}
+                  </a>
+                  {% if archivo.fecha %}
+                    <span class="text-muted">– {{ archivo.fecha }}</span>
+                  {% endif %}
+                </li>
+              {% endfor %}
             </ul>
+          {% else %}
+            <p class="text-muted mt-2 mb-0">No hay archivos en esta carpeta.</p>
+          {% endif %}
         </details>
-    {% endfor %}
-{% else %}
-    <p>No se encontraron archivos PDF en la ruta configurada.</p>
-{% endif %}
+      {% endfor %}
+    </div>
+
+  {% else %}
+    {% if not mensaje %}
+      <div class="alert alert-info">
+        No se encontraron pólizas para mostrar.
+      </div>
+    {% endif %}
+  {% endif %}
+
+</div>
 {% endblock %}
