@@ -4,50 +4,37 @@ import msal
 import requests
 from typing import List, Optional
 
-from fastapi import FastAPI, Request, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi.responses import (
+    HTMLResponse,
+    RedirectResponse,
+    FileResponse,   # aquí va FileResponse
+)
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-
-
-from pathlib import Path
-from typing import List, Optional
 
 import json
-from pathlib import Path
-
-import os
 import re
-import requests
 from msal import ConfidentialClientApplication
 from datetime import datetime, date
-
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
-# === CONFIGURACIÓN MSAL / GRAPH ===
+
+# === CONFIGURACIÓN MSAL / GRAPH (SharePoint viejo) ===
 TENANT_ID = os.getenv("TENANT_ID")
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-
 GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
-
 SHAREPOINT_HOST = "servicioscruzdelsur.sharepoint.com"
 SHAREPOINT_SITE_PATH = "/sites/Gestion"
-
-# Carpeta de pólizas y bancos en la biblioteca "Documentos compartidos"
 POLIZAS_FOLDER_PATH = "/Seguros/Pólizas"
 BANCOS_FOLDER_PATH = "/Seguros/Pólizas"
 
 # ---------------------------------------------------------------------
-# Cargar .env
+# Cargar .env y configuración Graph (correo)
 # ---------------------------------------------------------------------
 load_dotenv()
 
-# Config Graph (Azure AD)
 GRAPH_TENANT_ID = os.getenv("GRAPH_TENANT_ID", "")
 GRAPH_CLIENT_ID = os.getenv("GRAPH_CLIENT_ID", "")
 GRAPH_CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET", "")
@@ -55,40 +42,56 @@ GRAPH_USER = os.getenv("GRAPH_USER", "")
 GRAPH_FOLDER_DISPLAY_NAME = os.getenv("GRAPH_FOLDER_DISPLAY_NAME", "Seguros")
 GRAPH_BANKS_FOLDER_DISPLAY_NAME = os.getenv("GRAPH_BANKS_FOLDER_DISPLAY_NAME", "Bancos")
 
-# Carpeta de pólizas (misma del watcher)
+# Carpeta de pólizas (misma del watcher local, casi no se usa ahora)
 RUTA_POLIZAS = Path(
     r"/sites/Gestion/Documentos compartidos/Seguros/Pólizas"
 )
 
-# Almacén en memoria para clasificación de siniestros
+# Rutas de clasificación en disco
+RUTA_CLASIF = Path("clasificacion_siniestros.json")
+RUTA_CLASIF_BANCOS = Path("clasificacion_bancos.json")
+
+
+def cargar_clasificacion_bancos() -> dict[str, list[dict]]:
+    if not RUTA_CLASIF_BANCOS.exists():
+        return {}
+    try:
+        with RUTA_CLASIF_BANCOS.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {str(k): list(v) for k, v in data.items()}
+    except Exception as e:
+        print("[BANCOS] Error al leer clasificacion bancos:", e)
+        return {}
+
+
+def guardar_clasificacion_bancos(mapa: dict[str, list[dict]]) -> None:
+    try:
+        with RUTA_CLASIF_BANCOS.open("w", encoding="utf-8") as f:
+            json.dump(mapa, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("[BANCOS] Error al guardar clasificacion bancos:", e)
+
+
+# ---------------------------------------------------------------------
+# Almacenes en memoria
+# ---------------------------------------------------------------------
+# Siniestros
 CLASIFICACION_SINIESTROS: dict[str, list[dict]] = {}
-
-# Conjunto de IDs de correos ya clasificados (para que no aparezcan como "nuevos")
 CORREOS_CLASIFICADOS: set[str] = set()
-
-# Pólizas clasificadas con beneficiario banco (se guarda rel_path)
-POLIZAS_BENEF_BANCO: set[str] = set()
-
-# Correos de bancos clasificados por subcarpeta de pólizas
-CORREOS_BANCOS_CLASIFICADOS: dict[str, list[dict]] = {}
-
-# Patrón para detectar "N°123", "Nº 456", etc.
+CLASIF_SINIESTROS_MAIL: dict[str, str] = {}
 PATRON_SINIESTRO = re.compile(r"[Nn][°o]\s*([0-9]{3,})")
 
-
-CLASIFICACION_SINIESTROS: dict[str, list[dict]] = {}
-CORREOS_CLASIFICADOS: set[str] = set()
-
-CLASIF_SINIESTROS_MAIL: dict[str, str] = {}
-RUTA_CLASIF = Path("clasificacion_siniestros.json")
+# Bancos
+POLIZAS_BENEF_BANCO: set[str] = set()
+CORREOS_BANCOS_CLASIFICADOS: dict[str, list[dict]] = cargar_clasificacion_bancos()
 
 # ---------------------------------------------------------------------
 # FastAPI
 # ---------------------------------------------------------------------
 app = FastAPI(title="Gestión de Seguros Agua Santa")
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
 
 # ---------------------------------------------------------------------
 # Utilidades Pólizas
@@ -232,6 +235,7 @@ def get_sharepoint_site_and_drive():
 
 from datetime import datetime
 
+
 def get_sharepoint_folder_tree(folder_path: str):
     """
     Lee una carpeta de SharePoint (por ej. /Seguros/Pólizas) de forma recursiva
@@ -326,6 +330,25 @@ def get_sharepoint_folder_tree(folder_path: str):
     resultado.sort(key=lambda x: x["carpeta"].lower())
     return resultado
 
+def cargar_clasificacion_bancos() -> dict[str, list[dict]]:
+    if not RUTA_CLASIF_BANCOS.exists():
+        return {}
+    try:
+        with RUTA_CLASIF_BANCOS.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        # asegurar tipos correctos
+        return {str(k): list(v) for k, v in data.items()}
+    except Exception as e:
+        print("[BANCOS] Error al leer clasificacion bancos:", e)
+        return {}
+
+
+def guardar_clasificacion_bancos(mapa: dict[str, list[dict]]) -> None:
+    try:
+        with RUTA_CLASIF_BANCOS.open("w", encoding="utf-8") as f:
+            json.dump(mapa, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("[BANCOS] Error al guardar clasificacion bancos:", e)
 
 # ---------------------------------------------------------------------
 # Utilidades Microsoft Graph (correo)
@@ -554,6 +577,25 @@ def guardar_clasificacion_siniestros(mapa: dict[str, str]) -> None:
         
 CLASIF_SINIESTROS_MAIL = cargar_clasificacion_siniestros()
 
+def cargar_clasificacion_bancos() -> dict[str, list[dict]]:
+    if not RUTA_CLASIF_BANCOS.exists():
+        return {}
+    try:
+        with RUTA_CLASIF_BANCOS.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        # aseguramos tipos
+        return {str(k): list(v) for k, v in data.items()}
+    except Exception as e:
+        print("[BANCOS] Error al leer clasificacion bancos:", e)
+        return {}
+
+
+def guardar_clasificacion_bancos(mapa: dict[str, list[dict]]) -> None:
+    try:
+        with RUTA_CLASIF_BANCOS.open("w", encoding="utf-8") as f:
+            json.dump(mapa, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("[BANCOS] Error al guardar clasificacion bancos:", e)
 
 # ---------------------------------------------------------------------
 # Endpoints
@@ -918,6 +960,9 @@ async def clasificar_bancos(
             carpetas_filtradas[carpeta] = filtrados
 
     subcarpetas_polizas = [c["carpeta"] for c in polizas_data]
+       
+     # Persistir clasificación de bancos
+    guardar_clasificacion_bancos(CORREOS_BANCOS_CLASIFICADOS)
 
     return templates.TemplateResponse(
         "bancos.html",
@@ -931,4 +976,4 @@ async def clasificar_bancos(
         },
     )
 
-
+  
