@@ -21,8 +21,7 @@
             {% for doc in archivos %}
               <li>
                 <label>
-                  <input type="checkbox" name="seleccion"
-                         value="{{ doc.relpath }}">
+                  <input type="checkbox" name="seleccion" value="{{ doc.nombre }}">
                   {{ doc.nombre }}
                 </label>
               </li>
@@ -39,10 +38,10 @@
   {% endif %}
 
   <h2 class="h4 mt-5 mb-3">Correos en carpeta Bancos</h2>
-  {% if mailsbancos %}
+  {% if mails_bancos %}
     <form method="post" action="/bancos">
       <input type="hidden" name="origen" value="mails">
-      {% for mail in mailsbancos %}
+      {% for mail in mails_bancos %}
         <div class="mb-2 border rounded p-2">
           <div><strong>{{ mail.asunto }}</strong></div>
           <div class="text-muted">
@@ -51,8 +50,8 @@
           <div class="mt-2">
             <label>Subcarpeta pólizas:</label>
             <select name="mailcarpeta">
-              <option value="">-- sin asignar --</option>
-              {% for sub in subcarpetaspolizas %}
+                        <option value="">-- sin asignar --</option>
+              {% for sub in subcarpetas_polizas %}
                 <option value="{{ sub }}">{{ sub }}</option>
               {% endfor %}
             </select>
@@ -71,3 +70,4 @@
   {% endif %}
 </div>
 {% endblock %}
+
