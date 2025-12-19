@@ -22,7 +22,9 @@
       <ul class="mt-2">
         {% for doc in carpeta.archivos %}
           <li>
-            {{ doc.nombre }}
+            <a href="{{ doc.url }}" target="_blank">
+              {{ doc.nombre }}
+            </a>
             {% if doc.fecha %}
               <span class="text-muted">— {{ doc.fecha }}</span>
             {% endif %}
@@ -37,4 +39,3 @@
   </div>
 {% endif %}
 {% endblock %}
-
