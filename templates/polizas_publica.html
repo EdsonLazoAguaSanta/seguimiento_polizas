@@ -1,0 +1,35 @@
+{% extends "base_polizas_publica.html" %}
+
+{% block title %}Pólizas{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Pólizas</h1>
+
+<p class="text-muted">
+  Origen: SharePoint: {{ ruta_polizas }}
+</p>
+
+<h2 class="h4 mt-4 mb-3">Listado por carpetas</h2>
+
+{% if carpetas %}
+  {% for carpeta, archivos in carpetas.items() %}
+    <details class="mb-2">
+      <summary>{{ carpeta }} ({{ archivos|length }})</summary>
+      <ul class="mt-2">
+        {% for doc in archivos %}
+          <li>
+            {{ doc.nombre }}
+            {% if doc.mtime %}
+              <span class="text-muted">— {{ doc.mtime }}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% endfor %}
+{% else %}
+  <div class="alert alert-info">
+    No hay archivos en esta carpeta.
+  </div>
+{% endif %}
+{% endblock %}
