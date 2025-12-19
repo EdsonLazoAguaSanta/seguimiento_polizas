@@ -1,91 +1,73 @@
 {% extends "base.html" %}
-
-{% block title %}Bancos · Gestión de Seguros Agua Santa{% endblock %}
+{% block title %}Bancos{% endblock %}
 
 {% block content %}
-<h1>Clasificación para bancos</h1>
+<div class="container mt-4">
+  <h1 class="mb-3">Bancos</h1>
+  <p class="text-muted">Origen: SharePoint: {{ ruta_polizas }}</p>
 
-<form method="post" action="/bancos">
+  {% if mensaje %}
+    <div class="alert alert-warning">{{ mensaje }}</div>
+  {% endif %}
 
-    <!-- Bloque: correos nuevos desde carpeta Bancos en Outlook -->
-    {% if mails_bancos and subcarpetas_polizas %}
-        <h2>Correos nuevos (carpeta Outlook "Bancos")</h2>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Remitente</th>
-                    <th>Asunto</th>
-                    <th>Subcarpeta de pólizas</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for mail in mails_bancos %}
-                    <tr>
-                        <td>{{ mail.fecha }}</td>
-                        <td>{{ mail.remitente }}</td>
-                        <td>{{ mail.asunto }}</td>
-                        <td>
-                            <!-- id del mail -->
-                            <input type="hidden" name="mail_id" value="{{ mail.id }}">
-                            <!-- selector de subcarpeta destino -->
-                            <select name="mail_carpeta" class="form-select form-select-sm">
-                                <option value="">-- Seleccionar --</option>
-                                {% for carpeta in subcarpetas_polizas %}
-                                    <option value="{{ carpeta }}">{{ carpeta }}</option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <hr>
-    {% endif %}
+  <h2 class="h4 mt-4 mb-3">Seleccionar pólizas con banco beneficiario</h2>
+  {% if carpetas %}
+    <form method="post" action="/bancos">
+      <input type="hidden" name="origen" value="polizas">
+      {% for carpeta, archivos in carpetas.items() %}
+        <details class="mb-2">
+          <summary>{{ carpeta }} ({{ archivos|length }})</summary>
+          <ul class="mt-2">
+            {% for doc in archivos %}
+              <li>
+                <label>
+                  <input type="checkbox" name="seleccion"
+                         value="{{ doc.relpath }}">
+                  {{ doc.nombre }}
+                </label>
+              </li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary mt-2">
+        Guardar selección de pólizas
+      </button>
+    </form>
+  {% else %}
+    <div class="alert alert-info">No hay pólizas para mostrar.</div>
+  {% endif %}
 
-    <!-- Bloque: pólizas (PDF) + correos ya clasificados por subcarpeta -->
-    {% if carpetas %}
-        {% for carpeta, archivos in carpetas.items() %}
-            <details open>
-                <summary>
-                    {{ carpeta }} ({{ archivos|length }} póliza{{ 's' if archivos|length != 1 }})
-                </summary>
-                <ul>
-                    {% for doc in archivos %}
-                        <li>
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    name="seleccion"
-                                    value="{{ doc.rel_path }}"
-                                    {% if doc.rel_path in polizas_benef_banco %}checked{% endif %}
-                                >
-                                Beneficiario banco
-                            </label>
-                            &nbsp;|&nbsp;
-                            <a href="/polizas/view/{{ doc.rel_path }}" target="_blank">
-                                {{ doc.nombre }}
-                            </a>
-                            – {{ doc.mtime }}
-                        </li>
-                    {% endfor %}
-
-                    <!-- Correos clasificados en esta subcarpeta -->
-                    {% if correos_bancos_clasificados.get(carpeta) %}
-                        {% for mail in correos_bancos_clasificados[carpeta] %}
-                            <li>
-                                <strong>[MAIL]</strong>
-                                {{ mail.fecha }} – {{ mail.remitente }} – {{ mail.asunto }}
-                            </li>
-                        {% endfor %}
-                    {% endif %}
-                </ul>
-            </details>
-        {% endfor %}
-    {% else %}
-        <p>No se encontraron pólizas para bancos con los filtros actuales.</p>
-    {% endif %}
-
-    <button type="submit" class="btn btn-primary">Guardar clasificación</button>
-</form>
+  <h2 class="h4 mt-5 mb-3">Correos en carpeta Bancos</h2>
+  {% if mailsbancos %}
+    <form method="post" action="/bancos">
+      <input type="hidden" name="origen" value="mails">
+      {% for mail in mailsbancos %}
+        <div class="mb-2 border rounded p-2">
+          <div><strong>{{ mail.asunto }}</strong></div>
+          <div class="text-muted">
+            {{ mail.remitente }} – {{ mail.fecha }}
+          </div>
+          <div class="mt-2">
+            <label>Subcarpeta pólizas:</label>
+            <select name="mailcarpeta">
+              <option value="">-- sin asignar --</option>
+              {% for sub in subcarpetaspolizas %}
+                <option value="{{ sub }}">{{ sub }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="mailid" value="{{ mail.id }}">
+          </div>
+        </div>
+      {% endfor %}
+      <button type="submit" class="btn btn-success mt-2">
+        Guardar asignaciones
+      </button>
+    </form>
+  {% else %}
+    <div class="alert alert-info">
+      No se encontraron correos en la carpeta Bancos.
+    </div>
+  {% endif %}
+</div>
 {% endblock %}
