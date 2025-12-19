@@ -450,15 +450,18 @@ def leer_correos_bancos(max_mails: int = 50) -> list[dict]:
     mails: list[dict] = []
 
     token = get_graph_token()
+    if not token:
+        return mails
+
     headers = {"Authorization": f"Bearer {token}"}
     baseurl = "https://graph.microsoft.com/v1.0"
     user = GRAPH_USER or "me"
 
-    # buscar subcarpeta Bancos dentro de Inbox
+    # Buscar subcarpeta Bancos dentro de Inbox
     resp = requests.get(
         f"{baseurl}/users/{user}/mailFolders/inbox/childFolders",
         headers=headers,
-        params={"top": 200},
+        params={"$top": 200},
         timeout=15,
     )
     if resp.status_code != 200:
@@ -466,6 +469,8 @@ def leer_correos_bancos(max_mails: int = 50) -> list[dict]:
         return mails
 
     folders = resp.json().get("value", [])
+    print("DEBUG bancos folders:", [f.get("displayName") for f in folders])
+
     folder_id = None
     for f in folders:
         if f.get("displayName") == GRAPH_BANKS_FOLDER_DISPLAY_NAME:
@@ -473,31 +478,46 @@ def leer_correos_bancos(max_mails: int = 50) -> list[dict]:
             break
 
     if folder_id is None:
-        print(f"[GRAPH] Carpeta {GRAPH_BANKS_FOLDER_DISPLAY_NAME} no encontrada en Inbox.")
+        print(f"[GRAPH] Carpeta '{GRAPH_BANKS_FOLDER_DISPLAY_NAME}' no encontrada en Inbox.")
         return mails
 
-    # leer mensajes de esa carpeta
+    # Leer mensajes de esa carpeta
     resp = requests.get(
         f"{baseurl}/users/{user}/mailFolders/{folder_id}/messages",
         headers=headers,
         params={
-            "top": max_mails,
-            "select": "subject,from,receivedDateTime",
-            "orderby": "receivedDateTime desc",
+            "$top": max_mails,
+            "$select": "subject,from,receivedDateTime",
+            "$orderby": "receivedDateTime desc",
         },
         timeout=15,
     )
+    print("DEBUG bancos messages status:", resp.status_code)
+    print("DEBUG bancos messages body:", resp.text[:500])
+
     if resp.status_code != 200:
         print("[GRAPH] Error al leer mensajes Bancos:", resp.status_code, resp.text)
         return mails
 
-    for item in resp.json().get("value", []):
-        remitente = item.get("from", {}).get("emailAddress", {}).get("address")
-        asunto = item.get("subject")
-        fecha = item.get("receivedDateTime")
-        mail_id = item.get("id")
+    items = resp.json().get("value", [])
+    print("DEBUG bancos cantidad mails:", len(items))
+
+    for item in items:
+        remitente = (
+            item.get("from", {})
+            .get("emailAddress", {})
+            .get("address", "")
+        )
+        asunto = item.get("subject", "")
+        fecha = item.get("receivedDateTime", "")
+        mail_id = item.get("id", "")
         mails.append(
-            {"id": mail_id, "fecha": fecha, "remitente": remitente, "asunto": asunto}
+            {
+                "id": mail_id,
+                "fecha": fecha,
+                "remitente": remitente,
+                "asunto": asunto,
+            }
         )
 
     return mails
@@ -548,7 +568,7 @@ async def home(request: Request):
     )
 
 @app.get("/polizas", response_class=HTMLResponse)
-async def polizas(request: Request):
+async def pagina_polizas(request: Request):
     try:
         polizas = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
         mensaje = "" if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
@@ -560,66 +580,12 @@ async def polizas(request: Request):
         "polizas.html",
         {
             "request": request,
-            "polizas": polizas,
+            "polizas": polizas,                     # árbol desde SharePoint
             "ruta_base": f"SharePoint: {POLIZAS_FOLDER_PATH}",
             "mensaje": mensaje,
         },
     )
 
-
-@app.get("/polizas", response_class=HTMLResponse)
-async def pagina_polizas(request: Request):
-    carpetas = listar_pdfs_por_carpeta()
-
-    hoy = date.today()
-    nuevos_hoy: list[dict] = []
-    for carpeta, archivos in carpetas.items():
-        for doc in archivos:
-            if doc["mtime_date"] == hoy:
-                nuevos_hoy.append(
-                    {
-                        "carpeta": carpeta,
-                        "nombre": doc["nombre"],
-                        "mtime": doc["mtime"],
-                        "rel_path": doc["rel_path"],
-                    }
-                )
-
-    return templates.TemplateResponse(
-        "polizas.html",
-        {
-            "request": request,
-            "ruta_polizas": str(RUTA_POLIZAS),
-            "carpetas": carpetas,
-            "nuevos_hoy": nuevos_hoy,
-        },
-    )
-
-
-@app.get("/polizas/view/{path:path}")
-async def ver_poliza(path: str):
-    """
-    Sirve un PDF de la carpeta de pólizas para previsualizarlo en el navegador
-    (inline) en una pestaña nueva, sin forzar descarga.
-    """
-    file_path = (RUTA_POLIZAS / path).resolve()
-
-    # Seguridad básica: evitar salir de la carpeta base
-    if not str(file_path).startswith(str(RUTA_POLIZAS.resolve())):
-        raise HTTPException(status_code=400, detail="Ruta no permitida")
-
-    if not file_path.exists() or not file_path.is_file():
-        raise HTTPException(status_code=404, detail="Archivo no encontrado")
-
-    headers = {
-        "Content-Disposition": f'inline; filename="{file_path.name}"'
-    }  # inline para vista previa PDF [web:102]
-
-    return FileResponse(
-        path=str(file_path),
-        media_type="application/pdf",
-        headers=headers,
-    )
 
 
 @app.get("/siniestros", response_class=HTMLResponse)
@@ -829,80 +795,41 @@ async def guardar_clasificacion(request: Request):
         status_code=303,
     )
 
-@app.get("/bancos", response_class=HTMLResponse)
-async def bancos(request: Request):
-    polizas_data = []
-    correos_bancos = []
-    mensaje = None
-
-    # 1) Pólizas desde SharePoint (no dependen del correo)
-    try:
-        polizas_data = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
-    except Exception as e:
-        mensaje = f"Error al cargar pólizas: {e}"
-
-    # 2) Correos desde IMAP (si falla, sólo afecta la sección de correos)
-    try:
-        from test_imap_folders import get_emails_from_subfolder
-        correos_bancos = get_emails_from_subfolder("Bancos")
-    except Exception as e:
-        # no romper la página: solo informar
-        if mensaje:
-            mensaje += f" | Error al cargar correos: {e}"
-        else:
-            mensaje = f"Error al cargar correos: {e}"
-
-    return templates.TemplateResponse(
-        "bancos.html",
-        {
-            "request": request,
-            "polizas": polizas_data,
-            "correos": correos_bancos,
-            "mensaje": mensaje,
-            "ruta_base": POLIZAS_FOLDER_PATH,
-        },
-    )
-
-
-# -------------------------------
-# GET /bancos  (vista inicial)
-# -------------------------------
 from datetime import datetime
-
-from datetime import datetime
-from typing import Optional
 
 @app.get("/bancos", response_class=HTMLResponse)
 async def pagina_bancos(request: Request):
+    anio_actual = datetime.now().year
+
     try:
-        # mismas pólizas que en /polizas (desde disco local)
-        carpetas_completas = listar_pdfs_por_carpeta()
-
-        # filtrar: año actual y nombre que contenga "poliza"
-        anio_actual = datetime.now().year
-        carpetas_filtradas: dict[str, list[dict]] = {}
-        for carpeta, archivos in carpetas_completas.items():
-            filtrados = [
-                doc
-                for doc in archivos
-                if doc["mtime_date"].year == anio_actual
-                and "poliza" in doc["nombre"].lower()
-            ]
-            if filtrados:
-                carpetas_filtradas[carpeta] = filtrados
-
-        # correos de la subcarpeta Bancos vía Graph
-        mails_bancos = leer_correos_bancos(max_mails=50)
-
-        # subcarpetas disponibles para asignar correos
-        subcarpetas_polizas = listar_subcarpetas_polizas()
-
-        mensaje = None
+        polizas_data = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
+        mensaje = ""
     except Exception as e:
-        carpetas_filtradas = {}
-        mails_bancos = []
-        subcarpetas_polizas = []
-        mensaje = f"Error al cargar bancos: {e}"
+        polizas_data = []
+        mensaje = f"Error al cargar pólizas desde SharePoint: {e}"
+
+    # Armar estructura compatible con bancos.html
+    carpetas_filtradas: dict[str, list[dict]] = {}
+    for carpeta_info in polizas_data:
+        carpeta = carpeta_info["carpeta"]
+        filtrados = []
+        for a in carpeta_info["archivos"]:
+            fecha_dt = datetime.strptime(a["fecha"], "%Y-%m-%d %H:%M")
+            if fecha_dt.year != anio_actual:
+                continue
+            filtrados.append(
+                {
+                    "nombre": a["nombre"],
+                    "mtime": a["fecha"],
+                    "mtime_date": fecha_dt.date(),
+                    "rel_path": a["nombre"],   # usa nombre como clave única
+                }
+            )
+        if filtrados:
+            carpetas_filtradas[carpeta] = filtrados
+
+    mails_bancos = leer_correos_bancos(max_mails=50)
+    subcarpetas_polizas = [c["carpeta"] for c in polizas_data]
 
     return templates.TemplateResponse(
         "bancos.html",
@@ -914,15 +841,10 @@ async def pagina_bancos(request: Request):
             "subcarpetas_polizas": subcarpetas_polizas,
             "correos_bancos_clasificados": CORREOS_BANCOS_CLASIFICADOS,
             "mensaje": mensaje,
-            "ruta_polizas": str(RUTA_POLIZAS),
         },
     )
 
 
-
-# -------------------------------
-# POST /bancos  (proceso manual)
-# -------------------------------
 @app.post("/bancos", response_class=HTMLResponse)
 async def clasificar_bancos(
     request: Request,
@@ -930,11 +852,6 @@ async def clasificar_bancos(
     mail_id: Optional[list[str]] = Form(default=None),
     mail_carpeta: Optional[list[str]] = Form(default=None),
 ):
-    """
-    - 'seleccion': PDFs marcados como beneficiario banco (rel_path).
-    - 'mail_id': IDs de correos mostrados.
-    - 'mail_carpeta': subcarpeta seleccionada para cada mail (mismo índice que mail_id).
-    """
     global POLIZAS_BENEF_BANCO, CORREOS_BANCOS_CLASIFICADOS
 
     # Normalizar listas
@@ -943,11 +860,14 @@ async def clasificar_bancos(
     mail_carpeta = mail_carpeta or []
 
     # 1) Actualizar set de PDFs beneficiario banco
+    # OJO: aquí 'seleccion' debe traer el MISMO valor que uses como clave
+    # en GET /bancos (por ejemplo, el nombre de archivo)
     POLIZAS_BENEF_BANCO = set(seleccion)
 
     # 2) Limpiar clasificación anterior de correos y reconstruir
     CORREOS_BANCOS_CLASIFICADOS = {}
 
+    # Cachear mails una sola vez
     mails_bancos = leer_correos_bancos(max_mails=50)
 
     for mid, carpeta_destino in zip(mail_id, mail_carpeta):
@@ -961,22 +881,43 @@ async def clasificar_bancos(
 
         CORREOS_BANCOS_CLASIFICADOS.setdefault(carpeta_destino, []).append(info)
 
-    # reconstruir listado de pólizas, pero solo las marcadas
-    carpetas_completas = listar_pdfs_por_carpeta()
+    # 3) Volver a armar listado de PDFs filtrados (solo los marcados) desde SharePoint
     anio_actual = datetime.now().year
+    try:
+        polizas_data = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
+    except Exception:
+        polizas_data = []
+
     carpetas_filtradas: dict[str, list[dict]] = {}
-    for carpeta, archivos in carpetas_completas.items():
-        filtrados = [
-            doc
-            for doc in archivos
-            if doc["mtime_date"].year == anio_actual
-            and "poliza" in doc["nombre"].lower()
-            and doc["rel_path"] in POLIZAS_BENEF_BANCO
-        ]
+    for carpeta_info in polizas_data:
+        carpeta = carpeta_info["carpeta"]
+        filtrados = []
+        for a in carpeta_info["archivos"]:
+            # 'fecha' viene como "YYYY-mm-dd HH:MM"
+            fecha_dt = datetime.strptime(a["fecha"], "%Y-%m-%d %H:%M")
+            if fecha_dt.year != anio_actual:
+                continue
+
+            nombre = a["nombre"]
+            if "poliza" not in nombre.lower() and "póliza" not in nombre.lower():
+                continue
+
+            # aquí usamos nombre como "rel_path" lógico
+            if nombre not in POLIZAS_BENEF_BANCO:
+                continue
+
+            filtrados.append(
+                {
+                    "nombre": nombre,
+                    "mtime": a["fecha"],
+                    "mtime_date": fecha_dt.date(),
+                    "rel_path": nombre,
+                }
+            )
         if filtrados:
             carpetas_filtradas[carpeta] = filtrados
 
-    subcarpetas_polizas = listar_subcarpetas_polizas()
+    subcarpetas_polizas = [c["carpeta"] for c in polizas_data]
 
     return templates.TemplateResponse(
         "bancos.html",
@@ -987,8 +928,7 @@ async def clasificar_bancos(
             "mails_bancos": [],  # tras clasificar, ya no se muestran como nuevos
             "subcarpetas_polizas": subcarpetas_polizas,
             "correos_bancos_clasificados": CORREOS_BANCOS_CLASIFICADOS,
-            "ruta_polizas": str(RUTA_POLIZAS),
-            "mensaje": None,
         },
     )
+
 
