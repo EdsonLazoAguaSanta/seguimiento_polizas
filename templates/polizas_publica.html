@@ -18,7 +18,7 @@
     border-radius: 8px;
     padding: 24px 28px;
     /* velo verde al 52 %, deja ver el fondo */
-    background-color: rgba(21, 71, 52, 0.45);
+    background-color: rgba(21, 71, 52, 0.37);
   }
 
   .titulo-polizas {
@@ -42,7 +42,7 @@
   }
 
   .nav-carpetas .nav-link.active {
-    background-color: rgba(21, 71, 52, 0.45);
+    background-color: rgba(21, 71, 52, 0.37);
     color: #154734;
   }
 
@@ -150,7 +150,7 @@
                   </table>
                 </div>
               {% else %}
-                <p class="text-light mb-0">Sin documentos en esta carpeta.</p>
+               <span style="color:#154734; font-weight:600;">{{ doc.fecha }}</span>
               {% endif %}
             </div>
           {% endfor %}
@@ -160,6 +160,7 @@
   </div>
 </div>
 {% endblock %}
+
 
 
 
