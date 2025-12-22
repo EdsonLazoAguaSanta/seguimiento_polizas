@@ -327,11 +327,13 @@ def get_sharepoint_folder_tree(folder_path: str):
     resultado.sort(key=lambda x: x["carpeta"].lower())
     return resultado
 
+from datetime import datetime
+
 def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     """
-    Igual que get_sharepoint_folder_tree, pero:
+    Versión para la página pública:
     - NO exige que el nombre contenga 'póliza' / 'poliza'
-    - NO filtra por año (muestra cualquier año)
+    - SÍ filtra por año: solo año actual y año anterior
     """
     token = get_graph_token()
     headers = {"Authorization": f"Bearer {token}"}
@@ -343,6 +345,7 @@ def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     resp_folder.raise_for_status()
     root = resp_folder.json()
     root_id = root["id"]
+
     year_now = datetime.utcnow().year
     years_validos = {year_now, year_now - 1}
 
@@ -376,10 +379,13 @@ def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
                 fecha_str = it.get("lastModifiedDateTime")
                 try:
                     fecha_dt = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+                    # filtrar por año actual o anterior
+                    if fecha_dt.year not in years_validos:
+                        continue
                     fecha_fmt = fecha_dt.strftime("%Y-%m-%d %H:%M")
                 except Exception:
-                    fecha_dt = None
-                    fecha_fmt = fecha_str or ""
+                    # si no se puede parsear, se descarta
+                    continue
 
                 download_url = it.get("@microsoft.graph.downloadUrl")
 
