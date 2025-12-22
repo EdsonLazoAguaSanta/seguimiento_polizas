@@ -68,6 +68,79 @@
 
       <h2 class="h6 text-uppercase mb-3 panel-subtitulo" style="letter-spacing:.08em;">
         Carpetas
+      </h2>{% extends "base_polizas_publica.html" %}
+
+{% block title %}Pólizas{% endblock %}
+
+{% block content %}
+<style>
+  /* Marco grande izquierdo (todas las carpetas) */
+  .marco-carpetas {
+    border: 4px solid #154734;
+    border-radius: 28px;
+    padding: 24px 32px;
+    background-color: rgba(255, 255, 255, 0.12); /* leve velo sobre el fondo */
+  }
+
+  /* Viñeta derecha (listado de archivos) */
+  .vineta-archivos {
+    border: 4px solid #154734;
+    border-radius: 8px;
+    padding: 24px 28px;
+    /* mismo fondo de la página, solo velo verde al 52 % */
+    background-color: rgba(21, 71, 52, 0.52);
+  }
+
+  .titulo-polizas {
+    color: #154734;
+    font-size: 2.6rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .texto-origen {
+    color: #154734;
+    font-size: 0.95rem;
+    margin-bottom: 24px;
+  }
+
+  .nav-carpetas .nav-link {
+    border-radius: 999px;
+    font-weight: 600;
+    color: #154734;
+    background-color: transparent;
+  }
+
+  .nav-carpetas .nav-link.active {
+    background-color: rgba(21, 71, 52, 0.52); /* mismo velo que la viñeta */
+    color: #ffffff;
+  }
+
+  .vineta-subtitulo,
+  .vineta-archivos h3,
+  .vineta-archivos th {
+    color: #ffffff;
+  }
+
+  .vineta-archivos td a {
+    color: #e0f2e9;
+  }
+</style>
+
+<div class="row g-4">
+  <!-- Marco izquierdo: Pólizas + carpetas -->
+  <div class="col-12 col-lg-4">
+    <div class="marco-carpetas">
+      <h1 class="titulo-polizas mb-3">
+        Pólizas
+      </h1>
+
+      <p class="texto-origen">
+        SharePoint: {{ ruta_base }}
+      </p>
+
+      <h2 class="h6 text-uppercase mb-3" style="color:#154734; letter-spacing:.08em;">
+        Carpetas
       </h2>
 
       {% if polizas %}
@@ -96,10 +169,12 @@
         </div>
       {% endif %}
     </div>
+  </div>
 
-    <!-- Panel derecho: archivos -->
-    <div class="col-12 col-md-8">
-      <h2 class="h5 mb-3 panel-subtitulo">
+  <!-- Viñeta derecha: archivos de la carpeta seleccionada -->
+  <div class="col-12 col-lg-8">
+    <div class="vineta-archivos">
+      <h2 class="h5 mb-3 vineta-subtitulo">
         Archivos
       </h2>
 
@@ -113,41 +188,39 @@
               role="tabpanel"
               aria-labelledby="{{ tab_id }}-tab"
             >
-              <h3 class="h6 mb-3" style="color:#0c261b; font-weight:700;">
+              <h3 class="h6 mb-3" style="color:#ffffff; font-weight:700;">
                 {{ carpeta.carpeta }} — {{ carpeta.cantidad }} documento{{ 's' if carpeta.cantidad != 1 else '' }}
               </h3>
 
               {% if carpeta.archivos %}
-                <div class="tabla-archivos p-3">
-                  <div class="table-responsive">
-                    <table class="table table-sm align-middle text-nowrap">
-                      <thead>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle text-nowrap mb-0">
+                    <thead>
+                      <tr>
+                        <th scope="col">Nombre</th>
+                        <th scope="col" style="width: 170px;">Fecha</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for doc in carpeta.archivos %}
                         <tr>
-                          <th scope="col">Nombre</th>
-                          <th scope="col" style="width: 170px;">Fecha</th>
+                          <td>
+                            <a href="{{ doc.url }}" target="_blank">
+                              {{ doc.nombre }}
+                            </a>
+                          </td>
+                          <td>
+                            {% if doc.fecha %}
+                              <span class="text-light">{{ doc.fecha }}</span>
+                            {% endif %}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {% for doc in carpeta.archivos %}
-                          <tr>
-                            <td>
-                              <a href="{{ doc.url }}" target="_blank">
-                                {{ doc.nombre }}
-                              </a>
-                            </td>
-                            <td>
-                              {% if doc.fecha %}
-                                <span class="text-muted">{{ doc.fecha }}</span>
-                              {% endif %}
-                            </td>
-                          </tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
+                      {% endfor %}
+                    </tbody>
+                  </table>
                 </div>
               {% else %}
-                <p class="text-muted mb-0">Sin documentos en esta carpeta.</p>
+                <p class="text-light mb-0">Sin documentos en esta carpeta.</p>
               {% endif %}
             </div>
           {% endfor %}
@@ -157,4 +230,3 @@
   </div>
 </div>
 {% endblock %}
-
