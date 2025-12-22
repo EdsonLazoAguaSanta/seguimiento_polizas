@@ -327,27 +327,6 @@ def get_sharepoint_folder_tree(folder_path: str):
     resultado.sort(key=lambda x: x["carpeta"].lower())
     return resultado
 
-from datetime import datetime
-
-@app.get("/polizas_publicas", response_class=HTMLResponse)
-async def pagina_polizas_publicas(request: Request):
-    try:
-        polizas = get_polizas_cacheadas()
-        mensaje = " " if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
-    except Exception as e:
-        polizas = []
-        mensaje = f"Error al leer pólizas desde SharePoint: {e}"
-
-    return templates.TemplateResponse(
-        "polizas_publica.html",
-        {
-            "request": request,
-            "polizas": polizas,
-            "ruta_base": f"SharePoint / {POLIZASFOLDERPATH}",
-            "mensaje": mensaje,
-        },
-    )
-
 def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     """
     Versión para la página pública:
@@ -676,8 +655,6 @@ async def pagina_polizas_publicas(request: Request):
             "mensaje": mensaje,
         },
     )
-
-
 
 @app.get("/siniestros", response_class=HTMLResponse)
 async def pagina_siniestros(request: Request):
