@@ -4,82 +4,12 @@
 
 {% block content %}
 <style>
-  .contenedor-polizas {
-    border: 4px solid #0c261b;
-    border-radius: 26px;
-    padding: 24px;
-    background-color: rgba(255, 255, 255, 0.08); /* casi transparente, deja ver el fondo */
-  }
-
-  .panel-izquierdo {
-    border-right: 3px solid #0c261b;
-  }
-
-  .panel-titulo {
-    color: #0c261b;
-    font-size: 2.4rem;
-    font-weight: 700;
-    text-align: center;
-  }
-
-  .panel-subtitulo {
-    color: #0c261b;
-    font-weight: 600;
-  }
-
-  .texto-origen {
-    color: #154734;
-    font-size: 0.95rem;
-  }
-
-  .nav-carpetas .nav-link {
-    border-radius: 999px;
-    font-weight: 600;
-    color: #0c261b;
-    background-color: transparent;
-  }
-
-  .nav-carpetas .nav-link.active {
-    background-color: rgba(12, 38, 27, 0.18); /* verde claro translúcido */
-    color: #0c261b;
-  }
-
-  .tabla-archivos {
-    background-color: rgba(255, 255, 255, 0.08);
-    border-radius: 18px;
-  }
-
-  .tabla-archivos table {
-    margin-bottom: 0;
-  }
-</style>
-
-<div class="contenedor-polizas">
-  <div class="row">
-    <!-- Panel izquierdo: carpetas -->
-    <div class="col-12 col-md-4 panel-izquierdo mb-3 mb-md-0">
-      <h1 class="panel-titulo mb-3">
-        Pólizas
-      </h1>
-
-      <p class="texto-origen mb-4">
-        {{ ruta_base }}
-      </p>
-
-      <h2 class="h6 text-uppercase mb-3 panel-subtitulo" style="letter-spacing:.08em;">
-        Carpetas
-      </h2>{% extends "base_polizas_publica.html" %}
-
-{% block title %}Pólizas{% endblock %}
-
-{% block content %}
-<style>
   /* Marco grande izquierdo (todas las carpetas) */
   .marco-carpetas {
     border: 4px solid #154734;
     border-radius: 28px;
     padding: 24px 32px;
-    background-color: rgba(255, 255, 255, 0.12); /* leve velo sobre el fondo */
+    background-color: rgba(255, 255, 255, 0.12);
   }
 
   /* Viñeta derecha (listado de archivos) */
@@ -87,7 +17,7 @@
     border: 4px solid #154734;
     border-radius: 8px;
     padding: 24px 28px;
-    /* mismo fondo de la página, solo velo verde al 52 % */
+    /* velo verde al 52 %, deja ver el fondo */
     background-color: rgba(21, 71, 52, 0.52);
   }
 
@@ -112,7 +42,7 @@
   }
 
   .nav-carpetas .nav-link.active {
-    background-color: rgba(21, 71, 52, 0.52); /* mismo velo que la viñeta */
+    background-color: rgba(21, 71, 52, 0.52);
     color: #ffffff;
   }
 
