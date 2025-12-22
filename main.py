@@ -306,7 +306,7 @@ def get_sharepoint_folder_tree(folder_path: str):
                         "fecha": fecha_dt.strftime("%Y-%m-%d %H:%M"),
                     }
                 )
-
+    
     # acumulador: { "Aas": [archivos...], "Acar": [archivos...] }
     acumulador: dict[str, list[dict]] = {}
     # empezamos en la raíz; nombre_carpeta None porque aún no sabemos
@@ -326,6 +326,87 @@ def get_sharepoint_folder_tree(folder_path: str):
 
     resultado.sort(key=lambda x: x["carpeta"].lower())
     return resultado
+
+def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
+    """
+    Igual que get_sharepoint_folder_tree, pero:
+    - NO exige que el nombre contenga 'póliza' / 'poliza'
+    - NO filtra por año (muestra cualquier año)
+    """
+    token = get_graph_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    _, drive_id = get_sharepoint_site_and_drive()
+
+    # Carpeta raíz (ej /Seguros/Pólizas)
+    folder_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:{folder_path}"
+    resp_folder = requests.get(folder_url, headers=headers)
+    resp_folder.raise_for_status()
+    root = resp_folder.json()
+    root_id = root["id"]
+
+    def listar_recursivo(item_id: str, nombre_carpeta: str, acumulador: dict):
+        """
+        Recorre una carpeta y sus subcarpetas, acumulando archivos por
+        'nombre_carpeta' (clave de primer nivel).
+        """
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}/children"
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        items = resp.json().get("value", [])
+
+        for it in items:
+            # Si es subcarpeta, seguimos recursivamente
+            if "folder" in it:
+                sub_id = it["id"]
+                sub_name = it["name"]
+                if nombre_carpeta is None:
+                    agrupador = sub_name
+                else:
+                    agrupador = nombre_carpeta
+                listar_recursivo(sub_id, agrupador, acumulador)
+
+            # Si es archivo
+            elif "file" in it:
+                nombre_archivo = it.get("name", "")
+                if not nombre_archivo.lower().endswith(".pdf"):
+                    continue
+
+                fecha_str = it.get("lastModifiedDateTime")
+                try:
+                    fecha_dt = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+                    fecha_fmt = fecha_dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    fecha_dt = None
+                    fecha_fmt = fecha_str or ""
+
+                download_url = it.get("@microsoft.graph.downloadUrl")
+
+                carpeta_key = nombre_carpeta or "Otros"
+                acumulador.setdefault(carpeta_key, []).append(
+                    {
+                        "nombre": nombre_archivo,
+                        "url": download_url,
+                        "fecha": fecha_fmt,
+                    }
+                )
+
+    acumulador: dict[str, list[dict]] = {}
+    listar_recursivo(root_id, None, acumulador)
+
+    resultado = []
+    for carpeta, archivos in acumulador.items():
+        archivos_ordenados = sorted(archivos, key=lambda x: x["nombre"].lower())
+        resultado.append(
+            {
+                "carpeta": carpeta,
+                "cantidad": len(archivos_ordenados),
+                "archivos": archivos_ordenados,
+            }
+        )
+
+    resultado.sort(key=lambda x: x["carpeta"].lower())
+    return resultado
+
 
 def cargar_clasificacion_bancos() -> dict[str, list[dict]]:
     if not RUTA_CLASIF_BANCOS.exists():
@@ -552,7 +633,7 @@ async def pagina_polizas(request: Request):
 @app.get("/polizas_publicas", response_class=HTMLResponse)
 async def pagina_polizas_publicas(request: Request):
     try:
-        polizas = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
+        polizas = get_sharepoint_folder_tree_sin_filtros(POLIZAS_FOLDER_PATH)
         mensaje = "" if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
     except Exception as e:
         polizas = []
