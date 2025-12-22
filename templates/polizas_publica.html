@@ -3,43 +3,116 @@
 {% block title %}Pólizas{% endblock %}
 
 {% block content %}
-<h1 class="mb-3" style="color: #0c261b; font-size: 2.2rem;">
-  Pólizas
-</h1>
+<div class="row">
+  <!-- Columna izquierda: lista de carpetas -->
+  <div class="col-12 col-md-3 mb-3">
+    <div class="card shadow-sm">
+      <div class="card-body p-3">
+        <h1 class="mb-3" style="color:#0c261b; font-size:2.1rem;">
+          Pólizas
+        </h1>
 
-<p class="mb-3" style="color: #154734;">
-  Origen: SharePoint: {{ ruta_base }}
-</p>
+        <p class="mb-3" style="color:#154734;">
+          Origen: {{ ruta_base }}
+        </p>
 
-{% if mensaje %}
-  <div class="alert alert-warning mt-3">{{ mensaje }}</div>
-{% endif %}
+        {% if mensaje %}
+          <div class="alert alert-warning mt-3">{{ mensaje }}</div>
+        {% endif %}
 
-<h2 class="h4 mt-4 mb-3" style="color: #0c261b;">
-  Listado por carpetas
-</h2>
+        <h2 class="h6 text-uppercase mb-3" style="color:#0c261b; letter-spacing:.08em;">
+          Carpetas
+        </h2>
 
-{% if polizas %}
-  {% for carpeta in polizas %}
-    <details class="mb-2">
-      <summary><strong>{{ carpeta.carpeta }} ({{ carpeta.cantidad }})</strong></summary>
-      <ul class="mt-2">
-        {% for doc in carpeta.archivos %}
-          <li>
-            <a href="{{ doc.url }}" target="_blank">
-              {{ doc.nombre }}
-            </a>
-            {% if doc.fecha %}
-              <span class="text-muted">— {{ doc.fecha }}</span>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    </details>
-  {% endfor %}
-{% else %}
-  <div class="alert alert-info mt-3">
-    No hay archivos en esta carpeta.
+        {% if polizas %}
+          <ul class="nav nav-pills flex-column" id="carpetasTabs" role="tablist">
+            {% for carpeta in polizas %}
+              {# usar nombre de carpeta como id seguro #}
+              {% set tab_id = 'carpeta-' ~ loop.index %}
+              <li class="nav-item mb-1" role="presentation">
+                <button
+                  class="nav-link w-100 text-start {% if loop.first %}active{% endif %}"
+                  id="{{ tab_id }}-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#{{ tab_id }}"
+                  type="button"
+                  role="tab"
+                  aria-controls="{{ tab_id }}"
+                  aria-selected="{{ 'true' if loop.first else 'false' }}"
+                  style="font-weight:700; color:#0c261b;"
+                >
+                  {{ carpeta.carpeta }} ({{ carpeta.cantidad }})
+                </button>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="alert alert-info mt-3">
+            No hay archivos en esta carpeta.
+          </div>
+        {% endif %}
+      </div>
+    </div>
   </div>
-{% endif %}
+
+  <!-- Columna derecha: listado de pólizas de la carpeta seleccionada -->
+  <div class="col-12 col-md-9">
+    <div class="card shadow-sm">
+      <div class="card-body p-3">
+        <h2 class="h5 mb-3" style="color:#0c261b;">
+          Listado por carpetas
+        </h2>
+
+        {% if polizas %}
+          <div class="tab-content" id="carpetasTabsContent">
+            {% for carpeta in polizas %}
+              {% set tab_id = 'carpeta-' ~ loop.index %}
+              <div
+                class="tab-pane fade {% if loop.first %}show active{% endif %}"
+                id="{{ tab_id }}"
+                role="tabpanel"
+                aria-labelledby="{{ tab_id }}-tab"
+              >
+                <h3 class="h6 mb-3" style="color:#0c261b; font-weight:700;">
+                  {{ carpeta.carpeta }} — {{ carpeta.cantidad }} documento{{ 's' if carpeta.cantidad != 1 else '' }}
+                </h3>
+
+                {% if carpeta.archivos %}
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                      <thead>
+                        <tr>
+                          <th scope="col">Nombre</th>
+                          <th scope="col" style="width: 170px;">Fecha</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for doc in carpeta.archivos %}
+                          <tr>
+                            <td>
+                              <a href="{{ doc.url }}" target="_blank">
+                                {{ doc.nombre }}
+                              </a>
+                            </td>
+                            <td>
+                              {% if doc.fecha %}
+                                <span class="text-muted">{{ doc.fecha }}</span>
+                              {% endif %}
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% else %}
+                  <p class="text-muted mb-0">Sin documentos en esta carpeta.</p>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
