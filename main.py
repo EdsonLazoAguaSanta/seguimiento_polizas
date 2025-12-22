@@ -343,6 +343,8 @@ def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     resp_folder.raise_for_status()
     root = resp_folder.json()
     root_id = root["id"]
+    year_now = datetime.utcnow().year
+    years_validos = {year_now, year_now - 1}
 
     def listar_recursivo(item_id: str, nombre_carpeta: str, acumulador: dict):
         """
