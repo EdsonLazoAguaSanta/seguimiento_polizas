@@ -1,3 +1,4 @@
+
 from pathlib import Path
 import os
 import msal
@@ -306,7 +307,7 @@ def get_sharepoint_folder_tree(folder_path: str):
                         "fecha": fecha_dt.strftime("%Y-%m-%d %H:%M"),
                     }
                 )
-    
+
     # acumulador: { "Aas": [archivos...], "Acar": [archivos...] }
     acumulador: dict[str, list[dict]] = {}
     # empezamos en la raíz; nombre_carpeta None porque aún no sabemos
@@ -327,19 +328,19 @@ def get_sharepoint_folder_tree(folder_path: str):
     resultado.sort(key=lambda x: x["carpeta"].lower())
     return resultado
 
+from datetime import datetime
+
 def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     """
+    Igual que get_sharepoint_folder_tree, pero:
     Versión para la página pública:
     - NO exige que el nombre contenga 'póliza' / 'poliza'
+    - NO filtra por año (muestra cualquier año)
     - SÍ filtra por año: solo año actual y año anterior
     """
     token = get_graph_token()
     headers = {"Authorization": f"Bearer {token}"}
-    _, drive_id = get_sharepoint_site_and_drive()
-
-    # Carpeta raíz (ej /Seguros/Pólizas)
-    folder_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:{folder_path}"
-    resp_folder = requests.get(folder_url, headers=headers)
+@@ -343,6 +345,7 @@
     resp_folder.raise_for_status()
     root = resp_folder.json()
     root_id = root["id"]
@@ -347,33 +348,7 @@ def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     year_now = datetime.utcnow().year
     years_validos = {year_now, year_now - 1}
 
-    def listar_recursivo(item_id: str, nombre_carpeta: str, acumulador: dict):
-        """
-        Recorre una carpeta y sus subcarpetas, acumulando archivos por
-        'nombre_carpeta' (clave de primer nivel).
-        """
-        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}/children"
-        resp = requests.get(url, headers=headers)
-        resp.raise_for_status()
-        items = resp.json().get("value", [])
-
-        for it in items:
-            # Si es subcarpeta, seguimos recursivamente
-            if "folder" in it:
-                sub_id = it["id"]
-                sub_name = it["name"]
-                if nombre_carpeta is None:
-                    agrupador = sub_name
-                else:
-                    agrupador = nombre_carpeta
-                listar_recursivo(sub_id, agrupador, acumulador)
-
-            # Si es archivo
-            elif "file" in it:
-                nombre_archivo = it.get("name", "")
-                if not nombre_archivo.lower().endswith(".pdf"):
-                    continue
-
+@@ -376,836 +379,839 @@
                 fecha_str = it.get("lastModifiedDateTime")
                 try:
                     fecha_dt = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
@@ -382,6 +357,8 @@ def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
                         continue
                     fecha_fmt = fecha_dt.strftime("%Y-%m-%d %H:%M")
                 except Exception:
+                    fecha_dt = None
+                    fecha_fmt = fecha_str or ""
                     # si no se puede parsear, se descarta
                     continue
 
@@ -582,7 +559,7 @@ def guardar_clasificacion_siniestros(mapa: dict[str, str]) -> None:
             json.dump(mapa, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print("[SINIESTROS] Error al guardar clasificacion:", e)
-        
+
 CLASIF_SINIESTROS_MAIL = cargar_clasificacion_siniestros()
 
 def cargar_clasificacion_bancos() -> dict[str, list[dict]]:
@@ -617,25 +594,24 @@ async def home(request: Request):
         },
     )
 
-@app.get("/polizas_publicas", response_class=HTMLResponse)
-async def pagina_polizas_publicas(request: Request):
+@app.get("/polizas", response_class=HTMLResponse)
+async def pagina_polizas(request: Request):
     try:
-        polizas = get_polizas_cacheadas()
-        mensaje = " " if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
+        polizas = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
+        mensaje = "" if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
     except Exception as e:
         polizas = []
         mensaje = f"Error al leer pólizas desde SharePoint: {e}"
 
     return templates.TemplateResponse(
-        "polizas_publica.html",
+        "polizas.html",
         {
             "request": request,
-            "polizas": polizas,
-            "ruta_base": f"SharePoint / {POLIZASFOLDERPATH}",
+            "polizas": polizas,                     # árbol desde SharePoint
+            "ruta_base": f"SharePoint: {POLIZAS_FOLDER_PATH}",
             "mensaje": mensaje,
         },
     )
-
 
 @app.get("/polizas_publicas", response_class=HTMLResponse)
 async def pagina_polizas_publicas(request: Request):
@@ -655,6 +631,8 @@ async def pagina_polizas_publicas(request: Request):
             "mensaje": mensaje,
         },
     )
+
+
 
 @app.get("/siniestros", response_class=HTMLResponse)
 async def pagina_siniestros(request: Request):
