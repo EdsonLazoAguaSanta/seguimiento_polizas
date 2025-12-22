@@ -4,115 +4,123 @@
 
 {% block content %}
 <style>
-  .panel-carpetas {
-    border-radius: 18px;
+  .contenedor-polizas {
+    border: 4px solid #0c261b;
+    border-radius: 26px;
+    padding: 24px;
+    background-color: rgba(255, 255, 255, 0.08); /* casi transparente, deja ver el fondo */
   }
 
-  .panel-listado {
-    border-radius: 18px;
-    background-color: rgba(12, 38, 27, 0.06); /* verde muy claro, translúcido */
-    border: 1px solid rgba(12, 38, 27, 0.12);
-  }
-
-  .nav-carpetas .nav-link {
-    border-radius: 12px;
-    font-weight: 600;
-    color: #0c261b;
-  }
-
-  .nav-carpetas .nav-link.active {
-    color: #0c261b;
-    background-color: rgba(12, 38, 27, 0.06); /* mismo color que panel-listado */
-    border: 1px solid rgba(12, 38, 27, 0.12);
+  .panel-izquierdo {
+    border-right: 3px solid #0c261b;
   }
 
   .panel-titulo {
     color: #0c261b;
-    font-size: 2.2rem;
+    font-size: 2.4rem;
     font-weight: 700;
+    text-align: center;
   }
 
   .panel-subtitulo {
     color: #0c261b;
     font-weight: 600;
   }
+
+  .texto-origen {
+    color: #154734;
+    font-size: 0.95rem;
+  }
+
+  .nav-carpetas .nav-link {
+    border-radius: 999px;
+    font-weight: 600;
+    color: #0c261b;
+    background-color: transparent;
+  }
+
+  .nav-carpetas .nav-link.active {
+    background-color: rgba(12, 38, 27, 0.18); /* verde claro translúcido */
+    color: #0c261b;
+  }
+
+  .tabla-archivos {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+  }
+
+  .tabla-archivos table {
+    margin-bottom: 0;
+  }
 </style>
 
-<div class="row">
-  <!-- Columna izquierda: lista de carpetas -->
-  <div class="col-12 col-md-3 mb-3">
-    <div class="card shadow-sm panel-carpetas">
-      <div class="card-body p-3">
-        <h1 class="mb-3 panel-titulo">
-          Pólizas
-        </h1>
+<div class="contenedor-polizas">
+  <div class="row">
+    <!-- Panel izquierdo: carpetas -->
+    <div class="col-12 col-md-4 panel-izquierdo mb-3 mb-md-0">
+      <h1 class="panel-titulo mb-3">
+        Pólizas
+      </h1>
 
-        <p class="mb-3" style="color:#154734;">
-          {{ ruta_base }}
-        </p>
+      <p class="texto-origen mb-4">
+        SharePoint: {{ ruta_base }}
+      </p>
 
-        {% if mensaje %}
-          <div class="alert alert-warning mt-3">{{ mensaje }}</div>
-        {% endif %}
+      <h2 class="h6 text-uppercase mb-3 panel-subtitulo" style="letter-spacing:.08em;">
+        Carpetas
+      </h2>
 
-        <h2 class="h6 text-uppercase mb-3 panel-subtitulo" style="letter-spacing:.08em;">
-          Carpetas
-        </h2>
-
-        {% if polizas %}
-          <ul class="nav nav-pills flex-column nav-carpetas" id="carpetasTabs" role="tablist">
-            {% for carpeta in polizas %}
-              {% set tab_id = 'carpeta-' ~ loop.index %}
-              <li class="nav-item mb-1" role="presentation">
-                <button
-                  class="nav-link w-100 text-start {% if loop.first %}active{% endif %}"
-                  id="{{ tab_id }}-tab"
-                  data-bs-toggle="tab"
-                  data-bs-target="#{{ tab_id }}"
-                  type="button"
-                  role="tab"
-                  aria-controls="{{ tab_id }}"
-                  aria-selected="{{ 'true' if loop.first else 'false' }}"
-                >
-                  {{ carpeta.carpeta }} ({{ carpeta.cantidad }})
-                </button>
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <div class="alert alert-info mt-3">
-            No hay archivos en esta carpeta.
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <!-- Columna derecha: listado de pólizas de la carpeta seleccionada -->
-  <div class="col-12 col-md-9">
-    <div class="card shadow-sm panel-listado">
-      <div class="card-body p-3">
-        <h2 class="h5 mb-3 panel-subtitulo">
-          Archivos
-        </h2>
-
-        {% if polizas %}
-          <div class="tab-content" id="carpetasTabsContent">
-            {% for carpeta in polizas %}
-              {% set tab_id = 'carpeta-' ~ loop.index %}
-              <div
-                class="tab-pane fade {% if loop.first %}show active{% endif %}"
-                id="{{ tab_id }}"
-                role="tabpanel"
-                aria-labelledby="{{ tab_id }}-tab"
+      {% if polizas %}
+        <ul class="nav nav-pills flex-column nav-carpetas" id="carpetasTabs" role="tablist">
+          {% for carpeta in polizas %}
+            {% set tab_id = 'carpeta-' ~ loop.index %}
+            <li class="nav-item mb-1" role="presentation">
+              <button
+                class="nav-link w-100 text-start {% if loop.first %}active{% endif %}"
+                id="{{ tab_id }}-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#{{ tab_id }}"
+                type="button"
+                role="tab"
+                aria-controls="{{ tab_id }}"
+                aria-selected="{{ 'true' if loop.first else 'false' }}"
               >
-                <h3 class="h6 mb-3" style="color:#0c261b; font-weight:700;">
-                  {{ carpeta.carpeta }} — {{ carpeta.cantidad }} documento{{ 's' if carpeta.cantidad != 1 else '' }}
-                </h3>
+                {{ carpeta.carpeta }} ({{ carpeta.cantidad }})
+              </button>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="alert alert-info mt-3">
+          No hay archivos en esta carpeta.
+        </div>
+      {% endif %}
+    </div>
 
-                {% if carpeta.archivos %}
+    <!-- Panel derecho: archivos -->
+    <div class="col-12 col-md-8">
+      <h2 class="h5 mb-3 panel-subtitulo">
+        Archivos
+      </h2>
+
+      {% if polizas %}
+        <div class="tab-content" id="carpetasTabsContent">
+          {% for carpeta in polizas %}
+            {% set tab_id = 'carpeta-' ~ loop.index %}
+            <div
+              class="tab-pane fade {% if loop.first %}show active{% endif %}"
+              id="{{ tab_id }}"
+              role="tabpanel"
+              aria-labelledby="{{ tab_id }}-tab"
+            >
+              <h3 class="h6 mb-3" style="color:#0c261b; font-weight:700;">
+                {{ carpeta.carpeta }} — {{ carpeta.cantidad }} documento{{ 's' if carpeta.cantidad != 1 else '' }}
+              </h3>
+
+              {% if carpeta.archivos %}
+                <div class="tabla-archivos p-3">
                   <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
+                    <table class="table table-sm align-middle text-nowrap">
                       <thead>
                         <tr>
                           <th scope="col">Nombre</th>
@@ -137,14 +145,14 @@
                       </tbody>
                     </table>
                   </div>
-                {% else %}
-                  <p class="text-muted mb-0">Sin documentos en esta carpeta.</p>
-                {% endif %}
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
+                </div>
+              {% else %}
+                <p class="text-muted mb-0">Sin documentos en esta carpeta.</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
   </div>
 </div>
