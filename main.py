@@ -329,6 +329,25 @@ def get_sharepoint_folder_tree(folder_path: str):
 
 from datetime import datetime
 
+@app.get("/polizas_publicas", response_class=HTMLResponse)
+async def pagina_polizas_publicas(request: Request):
+    try:
+        polizas = get_polizas_cacheadas()
+        mensaje = " " if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
+    except Exception as e:
+        polizas = []
+        mensaje = f"Error al leer pólizas desde SharePoint: {e}"
+
+    return templates.TemplateResponse(
+        "polizas_publica.html",
+        {
+            "request": request,
+            "polizas": polizas,
+            "ruta_base": f"SharePoint / {POLIZASFOLDERPATH}",
+            "mensaje": mensaje,
+        },
+    )
+
 def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     """
     Versión para la página pública:
@@ -619,24 +638,25 @@ async def home(request: Request):
         },
     )
 
-@app.get("/polizas", response_class=HTMLResponse)
-async def pagina_polizas(request: Request):
+@app.get("/polizas_publicas", response_class=HTMLResponse)
+async def pagina_polizas_publicas(request: Request):
     try:
-        polizas = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
-        mensaje = "" if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
+        polizas = get_polizas_cacheadas()
+        mensaje = " " if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
     except Exception as e:
         polizas = []
         mensaje = f"Error al leer pólizas desde SharePoint: {e}"
 
     return templates.TemplateResponse(
-        "polizas.html",
+        "polizas_publica.html",
         {
             "request": request,
-            "polizas": polizas,                     # árbol desde SharePoint
-            "ruta_base": f"SharePoint: {POLIZAS_FOLDER_PATH}",
+            "polizas": polizas,
+            "ruta_base": f"SharePoint / {POLIZASFOLDERPATH}",
             "mensaje": mensaje,
         },
     )
+
 
 @app.get("/polizas_publicas", response_class=HTMLResponse)
 async def pagina_polizas_publicas(request: Request):
