@@ -228,21 +228,21 @@ def get_sharepoint_site_and_drive():
 
     return site_id, drive_id
 
-
-
 from datetime import datetime
+import requests
 
 
 def get_sharepoint_folder_tree(folder_path: str):
     """
-    Lee una carpeta de SharePoint (por ej. /Seguros/Pólizas) de forma recursiva
-    y devuelve una lista de carpetas con sus archivos PDF filtrados:
-      - nombre contiene 'póliza'
-      - año actual o año anterior
+    Versión interna:
+    - Siempre PDFs
+    - Filtra por nombre que contenga 'póliza' / 'poliza'
+      y por año (actual y anterior),
+      excepto en la carpeta de primer nivel 'Tasaciones',
+      donde NO se aplica ningún filtro de nombre ni de año.
     """
     token = get_graph_token()
     headers = {"Authorization": f"Bearer {token}"}
-
     _, drive_id = get_sharepoint_site_and_drive()
 
     # Carpeta raíz (ej /Seguros/Pólizas)
@@ -270,34 +270,40 @@ def get_sharepoint_folder_tree(folder_path: str):
             if "folder" in it:
                 sub_id = it["id"]
                 sub_name = it["name"]
-                # Usamos el nombre de la carpeta de primer nivel como agrupador
+                # nombre_carpeta es siempre la carpeta de primer nivel
                 if nombre_carpeta is None:
                     agrupador = sub_name
                 else:
                     agrupador = nombre_carpeta
                 listar_recursivo(sub_id, agrupador, acumulador)
+
             # Si es archivo
             elif "file" in it:
                 nombre_archivo = it.get("name", "")
                 if not nombre_archivo.lower().endswith(".pdf"):
                     continue
-                # debe contener "póliza" en el nombre
-                if "póliza" not in nombre_archivo.lower() and "poliza" not in nombre_archivo.lower():
-                    continue
 
-                # año de modificación
+                carpeta_key = nombre_carpeta or "Otros"
+                es_tasaciones = carpeta_key.lower() == "tasaciones"
+
+                # En TODAS menos Tasaciones exigimos 'póliza' / 'poliza' en el nombre
+                if not es_tasaciones:
+                    if "póliza" not in nombre_archivo.lower() and "poliza" not in nombre_archivo.lower():
+                        continue
+
                 fecha_str = it.get("lastModifiedDateTime")
                 try:
                     fecha_dt = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
-                    if fecha_dt.year not in years_validos:
-                        continue
                 except Exception:
-                    # si no se puede parsear la fecha, se descarta
+                    # si no se puede parsear, se descarta
                     continue
 
+                # En TODAS menos Tasaciones filtramos por año
+                if not es_tasaciones:
+                    if fecha_dt.year not in years_validos:
+                        continue
+
                 download_url = it.get("@microsoft.graph.downloadUrl")
-                # agrupamos por nombre_carpeta de primer nivel
-                carpeta_key = nombre_carpeta or "Otros"
 
                 acumulador.setdefault(carpeta_key, []).append(
                     {
@@ -307,12 +313,9 @@ def get_sharepoint_folder_tree(folder_path: str):
                     }
                 )
 
-    # acumulador: { "Aas": [archivos...], "Acar": [archivos...] }
     acumulador: dict[str, list[dict]] = {}
-    # empezamos en la raíz; nombre_carpeta None porque aún no sabemos
     listar_recursivo(root_id, None, acumulador)
 
-    # Convertir a la estructura que esperan los templates
     resultado = []
     for carpeta, archivos in acumulador.items():
         archivos_ordenados = sorted(archivos, key=lambda x: x["nombre"].lower())
@@ -327,13 +330,14 @@ def get_sharepoint_folder_tree(folder_path: str):
     resultado.sort(key=lambda x: x["carpeta"].lower())
     return resultado
 
-from datetime import datetime
 
 def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     """
     Versión para la página pública:
-    - NO exige que el nombre contenga 'póliza' / 'poliza'
-    - SÍ filtra por año: solo año actual y año anterior
+    - Siempre PDFs
+    - Filtra por año (actual y anterior) en todas las carpetas,
+      excepto en la carpeta de primer nivel 'Tasaciones',
+      donde NO se filtra por año ni por nombre.
     """
     token = get_graph_token()
     headers = {"Authorization": f"Bearer {token}"}
@@ -365,7 +369,7 @@ def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
                 sub_id = it["id"]
                 sub_name = it["name"]
                 if nombre_carpeta is None:
-                    agrupador = sub_name
+                    agrupador = sub_name  # carpeta de primer nivel
                 else:
                     agrupador = nombre_carpeta
                 listar_recursivo(sub_id, agrupador, acumulador)
@@ -376,20 +380,23 @@ def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
                 if not nombre_archivo.lower().endswith(".pdf"):
                     continue
 
+                carpeta_key = nombre_carpeta or "Otros"
+
                 fecha_str = it.get("lastModifiedDateTime")
                 try:
                     fecha_dt = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
-                    # filtrar por año actual o anterior
-                    if fecha_dt.year not in years_validos:
-                        continue
-                    fecha_fmt = fecha_dt.strftime("%Y-%m-%d %H:%M")
                 except Exception:
                     # si no se puede parsear, se descarta
                     continue
 
+                # En Tasaciones NO se aplica filtro de año
+                if carpeta_key.lower() not in {"tasaciones"}:
+                    if fecha_dt.year not in years_validos:
+                        continue
+
+                fecha_fmt = fecha_dt.strftime("%Y-%m-%d %H:%M")
                 download_url = it.get("@microsoft.graph.downloadUrl")
 
-                carpeta_key = nombre_carpeta or "Otros"
                 acumulador.setdefault(carpeta_key, []).append(
                     {
                         "nombre": nombre_archivo,
