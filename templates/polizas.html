@@ -3,51 +3,160 @@
 {% block title %}Pólizas{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<style>
+  /* Marco grande izquierdo (todas las carpetas) */
+  .marco-carpetas {
+    border: 4px solid #154734;
+    border-radius: 28px;
+    padding: 24px 32px;
+    background-color: rgba(255, 255, 255, 0.12);
+  }
 
-  <h1 class="mb-3">Pólizas</h1>
-  <p class="text-muted">Origen: SharePoint: {{ ruta_base }}</p>
+  /* Viñeta derecha (listado de archivos) */
+  .vineta-archivos {
+    border: 4px solid #154734;
+    border-radius: 8px;
+    padding: 24px 28px;
+    /* velo verde al 52 %, deja ver el fondo */
+    background-color: rgba(21, 71, 52, 0.22);
+  }
 
-  {% if mensaje %}
-    <div class="alert alert-warning">{{ mensaje }}</div>
-  {% endif %}
+  .titulo-polizas {
+    color: #154734;
+    font-size: 2.6rem;
+    font-weight: 700;
+    text-align: center;
+  }
 
-  {% if polizas %}
-    <h2 class="h4 mt-4 mb-3">Listado por carpetas</h2>
+  .texto-origen {
+    color: #154734;
+    font-size: 0.95rem;
+    margin-bottom: 24px;
+  }
 
-    <div class="mb-4">
-      {% for carpeta in polizas %}
-        <details class="mb-2">
-          <summary>
-            {{ carpeta.carpeta }} ({{ carpeta.cantidad }})
-          </summary>
-          {% if carpeta.archivos %}
-            <ul class="mt-2">
-              {% for archivo in carpeta.archivos %}
-                <li>
-                  <a href="{{ archivo.url }}" target="_blank">
-                    {{ archivo.nombre }}
-                  </a>
-                  {% if archivo.fecha %}
-                    <span class="text-muted">– {{ archivo.fecha }}</span>
-                  {% endif %}
-                </li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <p class="text-muted mt-2 mb-0">No hay archivos en esta carpeta.</p>
-          {% endif %}
-        </details>
-      {% endfor %}
+  .nav-carpetas .nav-link {
+    border-radius: 999px;
+    font-weight: 600;
+    color: #154734;
+    background-color: transparent;
+  }
+
+  .nav-carpetas .nav-link.active {
+    background-color: rgba(21, 71, 52, 0.22);
+    color: #154734;
+  }
+
+  .vineta-subtitulo,
+  .vineta-archivos h3,
+  .vineta-archivos th {
+    color: #154734;
+  }
+
+  .vineta-archivos td a {
+    color: #154734;
+  }
+</style>
+
+<div class="row g-4">
+  <!-- Marco izquierdo: Pólizas + carpetas -->
+  <div class="col-12 col-lg-4">
+    <div class="marco-carpetas">
+      <h1 class="titulo-polizas mb-3">
+        Pólizas
+      </h1>
+
+      <p class="texto-origen">
+        {{ ruta_base }}
+      </p>
+
+      <h2 class="h6 text-uppercase mb-3" style="color:#154734; letter-spacing:.08em;">
+        Carpetas
+      </h2>
+
+      {% if polizas %}
+        <ul class="nav nav-pills flex-column nav-carpetas" id="carpetasTabs" role="tablist">
+          {% for carpeta in polizas %}
+            {% set tab_id = 'carpeta-' ~ loop.index %}
+            <li class="nav-item mb-1" role="presentation">
+              <button
+                class="nav-link w-100 text-start {% if loop.first %}active{% endif %}"
+                id="{{ tab_id }}-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#{{ tab_id }}"
+                type="button"
+                role="tab"
+                aria-controls="{{ tab_id }}"
+                aria-selected="{{ 'true' if loop.first else 'false' }}"
+              >
+                {{ carpeta.carpeta }} ({{ carpeta.cantidad }})
+              </button>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="alert alert-info mt-3">
+          No hay archivos en esta carpeta.
+        </div>
+      {% endif %}
     </div>
+  </div>
 
-  {% else %}
-    {% if not mensaje %}
-      <div class="alert alert-info">
-        No se encontraron pólizas para mostrar.
-      </div>
-    {% endif %}
-  {% endif %}
+  <!-- Viñeta derecha: archivos de la carpeta seleccionada -->
+  <div class="col-12 col-lg-8">
+    <div class="vineta-archivos">
+      <h2 class="h5 mb-3 vineta-subtitulo">
+        Archivos
+      </h2>
 
+      {% if polizas %}
+        <div class="tab-content" id="carpetasTabsContent">
+          {% for carpeta in polizas %}
+            {% set tab_id = 'carpeta-' ~ loop.index %}
+            <div
+              class="tab-pane fade {% if loop.first %}show active{% endif %}"
+              id="{{ tab_id }}"
+              role="tabpanel"
+              aria-labelledby="{{ tab_id }}-tab"
+            >
+              <h3 class="h6 mb-3" style="color:#ffffff; font-weight:700;">
+                {{ carpeta.carpeta }} — {{ carpeta.cantidad }} documento{{ 's' if carpeta.cantidad != 1 else '' }}
+              </h3>
+
+              {% if carpeta.archivos %}
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle text-nowrap mb-0">
+                    <thead>
+                      <tr>
+                        <th scope="col">Nombre</th>
+                        <th scope="col" style="width: 170px;">Fecha</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for doc in carpeta.archivos %}
+                        <tr>
+                          <td>
+                            <a href="{{ doc.url }}" target="_blank">
+                              {{ doc.nombre }}
+                            </a>
+                          </td>
+                          <td>
+                            {% if doc.fecha %}
+                              <span style="color:#154734; font-weight:600;">{{ doc.fecha }}</span>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+               <span style="color:#154734; font-weight:600;">{{ doc.fecha }}</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
 </div>
 {% endblock %}
