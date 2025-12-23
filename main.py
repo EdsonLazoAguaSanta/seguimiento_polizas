@@ -628,7 +628,7 @@ async def home(request: Request):
 @app.get("/polizas", response_class=HTMLResponse)
 async def pagina_polizas(request: Request):
     try:
-        polizas = get_sharepoint_folder_tree(POLIZAS_FOLDER_PATH)
+        polizas = get_sharepoint_folder_tree_sin_filtros(POLIZAS_FOLDER_PATH)
         mensaje = "" if polizas else "No se encontraron archivos PDF en la carpeta de SharePoint configurada."
     except Exception as e:
         polizas = []
