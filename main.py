@@ -4,6 +4,13 @@ import msal
 import requests
 from typing import List, Optional
 
+from fastapi.responses import (
+    HTMLResponse,
+    RedirectResponse,
+    FileResponse,
+    Response,  # <-- agrega esto
+)
+
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.responses import (
     HTMLResponse,
@@ -228,6 +235,8 @@ def get_sharepoint_site_and_drive():
 
     return site_id, drive_id
 
+
+
 from datetime import datetime
 import requests
 
@@ -331,6 +340,10 @@ def get_sharepoint_folder_tree(folder_path: str):
     return resultado
 
 
+from datetime import datetime
+import requests
+
+
 def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     """
     Versión para la página pública:
@@ -422,6 +435,7 @@ def get_sharepoint_folder_tree_sin_filtros(folder_path: str):
     resultado.sort(key=lambda x: x["carpeta"].lower())
     return resultado
 
+
 def cargar_clasificacion_bancos() -> dict[str, list[dict]]:
     if not RUTA_CLASIF_BANCOS.exists():
         return {}
@@ -470,6 +484,142 @@ def get_graph_token() -> str | None:
         )
         return None
 
+def leercorreo_siniestro_por_id(mail_id: str) -> dict | None:
+    """
+    Devuelve un correo de la carpeta Siniestros (GRAPHFOLDERDISPLAYNAME)
+    con body HTML y lista de adjuntos (nombre y url de descarga), 
+    o None si no existe.
+    """
+    token = get_graph_token()
+    if not token:
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Prefer": "outlook.body-content-type=\"html\"",
+    }
+    baseurl = "https://graph.microsoft.com/v1.0"
+    user = GRAPH_USER or "me"
+
+    # 1) localizar carpeta Siniestros dentro de Inbox (igual que leercorreosgraph)
+    resp = requests.get(
+        f"{baseurl}/users/{user}/mailFolders/inbox/childFolders",
+        headers=headers,
+        params={"top": 200},
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        print("GRAPH Error al listar carpetas Siniestros:", resp.status_code, resp.text)
+        return None
+
+    folders = resp.json().get("value", [])
+    folder_id = None
+    for f in folders:
+        if f.get("displayName") == GRAPH_FOLDER_DISPLAY_NAME:
+            folder_id = f.get("id")
+            break
+    if folder_id is None:
+        print(f"GRAPH Carpeta {GRAPH_FOLDER_DISPLAY_NAME} no encontrada en Inbox.")
+        return None
+
+    # 2) leer mensaje concreto por id dentro de esa carpeta
+    resp = requests.get(
+        f"{baseurl}/users/{user}/mailFolders/{folder_id}/messages/{mail_id}",
+        headers=headers,
+        params={"select": "id,subject,from,receivedDateTime,body,hasAttachments"},
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        print("GRAPH Error al leer mensaje Siniestros por id:", resp.status_code, resp.text)
+        return None
+
+    item = resp.json()
+    remitente = item.get("from", {}).get("emailAddress", {}).get("address")
+    body = item.get("body", {}) or {}
+    body_html = body.get("content", "")
+
+    # 3) si tiene adjuntos, listarlos
+    adjuntos = []
+    if item.get("hasAttachments"):
+        resp_att = requests.get(
+            f"{baseurl}/users/{user}/mailFolders/{folder_id}/messages/{mail_id}/attachments",
+            headers=headers,
+            timeout=15,
+        )
+        if resp_att.status_code == 200:
+            for att in resp_att.json().get("value", []):
+                if att.get("@odata.type") == "#microsoft.graph.fileAttachment":
+                    adjuntos.append(
+                        {
+                            "id": att["id"],
+                            "nombre": att.get("name"),
+                            "contentType": att.get("contentType", "application/octet-stream"),
+                        }
+                    )
+
+
+
+    return {
+        "id": item.get("id"),
+        "fecha": item.get("receivedDateTime"),
+        "remitente": remitente,
+        "asunto": item.get("subject"),
+        "body_html": body_html,
+        "adjuntos": adjuntos,
+    }
+
+@app.get("/siniestros/mail/{mail_id}/adjunto/{att_id}")
+async def descargar_adjunto_siniestro(mail_id: str, att_id: str):
+    token = get_graph_token()
+    if not token:
+        raise HTTPException(status_code=500, detail="No se pudo obtener token de Graph")
+
+    headers = {"Authorization": f"Bearer {token}"}
+    baseurl = "https://graph.microsoft.com/v1.0"
+    user = GRAPH_USER or "me"
+
+    # 1) Obtener metadatos del adjunto (nombre y tipo)
+    meta_resp = requests.get(
+        f"{baseurl}/users/{user}/messages/{mail_id}/attachments/{att_id}",
+        headers=headers,
+        timeout=15,
+    )
+    if meta_resp.status_code != 200:
+        raise HTTPException(status_code=meta_resp.status_code, detail=meta_resp.text)
+
+    meta = meta_resp.json()
+    filename = meta.get("name", "adjunto.bin")
+    content_type = meta.get("contentType", "application/octet-stream")
+
+    # 2) Descargar contenido del adjunto
+    data_resp = requests.get(
+        f"{baseurl}/users/{user}/messages/{mail_id}/attachments/{att_id}/$value",
+        headers=headers,
+        timeout=30,
+    )
+    if data_resp.status_code != 200:
+        raise HTTPException(status_code=data_resp.status_code, detail=data_resp.text)
+
+    return Response(
+        content=data_resp.content,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/siniestros/mail/{mail_id}", name="ver_mail_siniestros", response_class=HTMLResponse)
+async def ver_mail_siniestros(request: Request, mail_id: str):
+    mail = leercorreo_siniestro_por_id(mail_id)
+    if not mail:
+        raise HTTPException(status_code=404, detail="Correo de siniestros no encontrado")
+
+    return templates.TemplateResponse(
+        "preview_mail_siniestros.html",
+        {
+            "request": request,
+            "mail": mail,
+        },
+    )
 
 def leer_correos_graph(max_mails: int = 50):
     mails: list[dict] = []
@@ -529,6 +679,7 @@ def leer_correos_graph(max_mails: int = 50):
         fecha = item.get("receivedDateTime", "")
         mails.append(
             {
+                "id": item.get("id"),
                 "fecha": fecha,
                 "remitente": remitente,
                 "asunto": asunto,
@@ -740,6 +891,21 @@ async def pagina_siniestros(request: Request):
         },
     )
 
+from fastapi import HTTPException
+
+@app.get("/siniestros/mail/{mail_id}", name="ver_mail_siniestros", response_class=HTMLResponse)
+async def ver_mail_siniestros(request: Request, mail_id: str):
+    mail = leercorreo_siniestro_por_id(mail_id)
+    if not mail:
+        raise HTTPException(status_code=404, detail="Correo de siniestros no encontrado")
+
+    return templates.TemplateResponse(
+        "preview_mail_siniestros.html",
+        {
+            "request": request,
+            "mail": mail,
+        },
+    )
 
 @app.post("/siniestros")
 async def clasificar_siniestros(request: Request):
