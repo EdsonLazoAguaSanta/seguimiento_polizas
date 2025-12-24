@@ -868,7 +868,7 @@ async def pagina_siniestros(request: Request):
             "n_siniestro": numero_guardado,  # puede ser None
         }
 
-        if diff_dias is not None and diff_dias <= 3:
+        if diff_dias is not None and diff_dias <= 10:
             nuevos.append(registro)
         else:
             historicos.append(registro)
