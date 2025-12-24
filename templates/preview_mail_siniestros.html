@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Correo de siniestro{% endblock %}
+
+{% block content %}
+<h1>Correo de siniestro</h1>
+
+<p><strong>Fecha:</strong> {{ mail.fecha }}</p>
+<p><strong>Remitente:</strong> {{ mail.remitente }}</p>
+<p><strong>Asunto:</strong> {{ mail.asunto }}</p>
+
+<hr>
+
+<h2>Cuerpo del correo</h2>
+<div style="border:1px solid #ccc; padding:12px; background:#fff; max-height:70vh; overflow:auto;">
+  {{ mail.body_html | safe }}
+</div>
+
+{% if mail.adjuntos %}
+  <hr>
+  <h2>Adjuntos</h2>
+  <ul>
+    {% for adj in mail.adjuntos %}
+      <li>
+        <a href="{{ url_for('descargar_adjunto_siniestro', mail_id=mail.id, att_id=adj.id) }}">
+          {{ adj.nombre }}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% endblock %}
