@@ -1,127 +1,137 @@
 {% extends "base.html" %}
+
 {% block title %}Siniestros{% endblock %}
 
 {% block content %}
 <h1>Siniestros</h1>
 
-{% if modo_demo %}
-<p><strong>Modo demo:</strong> No se pudieron leer correos reales, se muestran ejemplos.</p>
+{% if mododemo %}
+  <p><strong>Modo demo</strong>: No se pudieron leer correos reales, se muestran ejemplos.</p>
 {% endif %}
 
 <details open>
-  <summary><strong>Nuevos </strong> ({{ nuevos|length }})</summary>
+  <summary><strong>Nuevos</strong> ({{ nuevos|length }})</summary>
+
   <h2>Nuevos (últimos días)</h2>
-{% if nuevos %}
-<form method="post" action="/siniestros">
-  <input type="hidden" name="origen" value="nuevos">
-  <table class="tabla-siniestros">
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Remitente</th>
-        <th>Asunto</th>
-        <th>N° de siniestro</th>
-        <th>Acción</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for m in nuevos %}
-      <tr>
-        <td>{{ m.fecha_mostrar }}</td>
-        <td>{{ m.remitente }}</td>
-        <td>{{ m.asunto }}</td>
-        <td>
-          <input type="hidden" name="id_nuevo_{{ loop.index0 }}" value="{{ m.id }}">
-          <input type="hidden" name="fecha_nuevo_{{ loop.index0 }}" value="{{ m.fecha_mostrar }}">
-          <input type="hidden" name="remitente_nuevo_{{ loop.index0 }}" value="{{ m.remitente }}">
-          <input type="hidden" name="asunto_nuevo_{{ loop.index0 }}" value="{{ m.asunto }}">
 
-          <!-- valor REAL que se envía al backend -->
-          <input
-            type="hidden"
-            name="siniestro_nuevo_{{ loop.index0 }}"
-            id="siniestro_nuevo_{{ loop.index0 }}_hidden"
-            value="{{ m.n_siniestro or '' }}"
-          >
+  {% if nuevos %}
+    <form method="post" action="{{ url_for('clasificar_siniestros') }}">
+      <input type="hidden" name="origen" value="nuevos">
 
-          <!-- campo visible, bloqueado hasta hacer clic en el lápiz -->
-          <input
-            type="text"
-            id="siniestro_nuevo_{{ loop.index0 }}"
-            value="{{ m.n_siniestro or '' }}"
-            class="input-siniestro{% if not m.n_siniestro %} editable{% endif %}"
-            readonly
-          >
-        </td>
+      <table class="tabla-siniestros">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Remitente</th>
+            <th>Asunto</th>
+            <th>N° de siniestro</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in nuevos %}
+            <tr>
+              <td>{{ m.fechamostrar }}</td>
+              <td>{{ m.remitente }}</td>
+              <td>
+                <a href="{{ url_for('ver_mail_siniestros', mail_id=m.id) }}" target="_blank">
+                  {{ m.asunto }}
+                </a>
 
-        <td>
-          <button
-            type="button"
-            class="btn-lapiz"
-            onclick="habilitarEdicion({{ loop.index0 }})"
-            title="Editar clasificación"
-          >
-            ✏️
-          </button>
-        </td>
+              </td>
+              <td>
+                {# valores que se envían al backend #}
+                <input type="hidden" name="id_nuevo_{{ loop.index0 }}" value="{{ m.id }}">
+                <input type="hidden" name="fecha_nuevo_{{ loop.index0 }}" value="{{ m.fechamostrar }}">
+                <input type="hidden" name="remitente_nuevo_{{ loop.index0 }}" value="{{ m.remitente }}">
+                <input type="hidden" name="asunto_nuevo_{{ loop.index0 }}" value="{{ m.asunto }}">
 
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <button type="submit">Guardar clasificación de nuevos</button>
-</form>
-{% else %}
-<p>No hay correos nuevos en los últimos 7 días.</p>
-{% endif %}
+                {# valor REAL que se envía al backend #}
+                <input type="hidden"
+                       name="siniestro_nuevo_{{ loop.index0 }}"
+                       id="siniestro_nuevo_{{ loop.index0 }}_hidden"
+                       value="{{ m.nsiniestro or '' }}">
+
+                {# campo visible, bloqueado hasta hacer clic en el lápiz #}
+                <input type="text"
+                       id="siniestro_nuevo_{{ loop.index0 }}"
+                       value="{{ m.nsiniestro or '' }}"
+                       class="input-siniestro{% if not m.nsiniestro %} editable{% endif %}"
+                       {% if not m.nsiniestro %}{% else %}readonly{% endif %}>
+              </td>
+              <td>
+                <button type="button"
+                        class="btn-lapiz"
+                        onclick="habilitarEdicion('{{ loop.index0 }}')"
+                        title="Editar clasificación">
+                  ✎
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="submit">Guardar clasificación de nuevos</button>
+    </form>
+  {% else %}
+    <p>No hay correos nuevos en los últimos 7 días.</p>
+  {% endif %}
 </details>
 
 <details>
-  <summary><strong>Históricos </strong> ({{ historicos|length }})</summary>
-  <h2>Históricos</h2>
-{% if historicos %}
-<form method="post" action="/siniestros">
-  <input type="hidden" name="origen" value="historicos">
-  <table class="tabla-siniestros">
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Remitente</th>
-        <th>Asunto</th>
-        <th>N° de siniestro</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for m in historicos %}
-      <tr>
-        <td>{{ m.fecha_mostrar }}</td>
-        <td>{{ m.remitente }}</td>
-        <td>{{ m.asunto }}</td>
-        <td>
-          <input type="hidden" name="id_historico_{{ loop.index0 }}" value="{{ m.id }}">
-          <input type="hidden" name="fecha_historico_{{ loop.index0 }}" value="{{ m.fecha_mostrar }}">
-          <input type="hidden" name="remitente_historico_{{ loop.index0 }}" value="{{ m.remitente }}">
-          <input type="hidden" name="asunto_historico_{{ loop.index0 }}" value="{{ m.asunto }}">
+  <summary><strong>Históricos</strong> ({{ historicos|length }})</summary>
 
-          {% if m.n_siniestro %}
-            {{ m.n_siniestro }}
-          {% else %}
-            <input
-              type="text"
-              name="siniestro_historico_{{ loop.index0 }}"
-              value=""
-            >
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <button type="submit">Guardar clasificación de históricos</button>
-</form>
-{% else %}
-<p>No hay correos históricos.</p>
-{% endif %}
+  <h2>Históricos</h2>
+
+  {% if historicos %}
+    <form method="post" action="{{ url_for('clasificar_siniestros') }}">
+      <input type="hidden" name="origen" value="historicos">
+
+      <table class="tabla-siniestros">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Remitente</th>
+            <th>Asunto</th>
+            <th>N° de siniestro</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in historicos %}
+            <tr>
+              <td>{{ m.fechamostrar }}</td>
+              <td>{{ m.remitente }}</td>
+              <td>
+                <a href="{{ url_for('ver_mail_siniestros', mail_id=m.id) }}" target="_blank">
+                  {{ m.asunto }}
+                </a>
+              </td>
+              <td>
+                <input type="hidden" name="id_historico_{{ loop.index0 }}" value="{{ m.id }}">
+                <input type="hidden" name="fecha_historico_{{ loop.index0 }}" value="{{ m.fechamostrar }}">
+                <input type="hidden" name="remitente_historico_{{ loop.index0 }}" value="{{ m.remitente }}">
+                <input type="hidden" name="asunto_historico_{{ loop.index0 }}" value="{{ m.asunto }}">
+
+                {% if m.nsiniestro %}
+                  {{ m.nsiniestro }}
+                {% else %}
+                  <input type="text"
+                         name="siniestro_historico_{{ loop.index0 }}"
+                         value=""
+                         style="width: 140px;">
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="submit">Guardar clasificación de históricos</button>
+    </form>
+  {% else %}
+    <p>No hay correos históricos.</p>
+  {% endif %}
 </details>
 
 <hr>
@@ -131,23 +141,24 @@
 {% if agrupado %}
   {% for numero, lista in agrupado.items() %}
     <details>
-      <summary><strong>Siniestro N° {{ numero }}</strong> ({{ lista|length }})</summary>
+      <summary>
+        <strong>Siniestro N° {{ numero }}</strong> ({{ lista|length }})
+      </summary>
       <ul>
         {% for c in lista %}
           <li>
-            {{ c.fecha_mostrar }} -
-            <a href="#"
-               onclick="alert('Aquí en el futuro podemos abrir el correo asociado o su detalle.'); return false;">
-               {{ c.asunto }}
+            {{ c.fechamostrar }} –
+            <a href="{{ url_for('ver_mail_siniestros', mail_id=c.id) }}" target="_blank">
+              {{ c.asunto }}
             </a>
-            ({{ c.remitente }})
+            – {{ c.remitente }}
           </li>
         {% endfor %}
       </ul>
     </details>
   {% endfor %}
 {% else %}
-<p>Aún no hay siniestros clasificados.</p>
+  <p>Aún no hay siniestros clasificados.</p>
 {% endif %}
 
 <style>
@@ -159,8 +170,9 @@
     font-size: 18px;
     line-height: 1;
   }
-  .btn-lapiz:focus { outline: none; }
-
+  .btn-lapiz:focus {
+    outline: none;
+  }
   .input-siniestro {
     background-color: #f3f3f3;
     border: 1px solid #ccc;
@@ -168,21 +180,30 @@
   .input-siniestro.editable {
     background-color: #ffffff;
   }
+  .tabla-siniestros {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .tabla-siniestros th,
+  .tabla-siniestros td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #ddd;
+  }
 </style>
 
 <script>
   function habilitarEdicion(idx) {
-    const visible = document.getElementById("siniestro_nuevo_" + idx);
-    const hidden  = document.getElementById("siniestro_nuevo_" + idx + "_hidden");
+    const visible = document.getElementById('siniestro_nuevo_' + idx);
+    const hidden = document.getElementById('siniestro_nuevo_' + idx + '_hidden');
+
     if (visible && hidden) {
       visible.readOnly = false;
-      visible.classList.add("editable");
+      visible.classList.add('editable');
       visible.focus();
-      visible.addEventListener("input", function () {
+      visible.addEventListener('input', function () {
         hidden.value = visible.value;
       });
     }
   }
 </script>
-
 {% endblock %}
