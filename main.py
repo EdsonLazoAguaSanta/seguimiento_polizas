@@ -84,7 +84,7 @@ def guardar_clasificacion_bancos(mapa: dict[str, list[dict]]) -> None:
 # Almacenes en memoria
 # ---------------------------------------------------------------------
 # Siniestros
-CLASIFICACION_SINIESTROS: dict[str, list[dict]] = {}
+#CLASIFICACION_SINIESTROS: dict[str, list[dict]] = {}
 CORREOS_CLASIFICADOS: set[str] = set()
 CLASIF_SINIESTROS_MAIL: dict[str, str] = {}
 PATRON_SINIESTRO = re.compile(r"[Nn][°o]\s*([0-9]{3,})")
@@ -818,8 +818,11 @@ async def pagina_polizas_publicas(request: Request):
 
 @app.get("/siniestros", response_class=HTMLResponse)
 async def pagina_siniestros(request: Request):
+    """Página principal de siniestros"""
     mails_base = leer_correos_graph(max_mails=200)
     modo_demo = False
+    
+    # Si no hay correos, usar demo
     if not mails_base:
         modo_demo = True
         mails_base = [
@@ -829,17 +832,25 @@ async def pagina_siniestros(request: Request):
                 "remitente": "cliente1@ejemplo.cl",
                 "asunto": "[ALERTA] Nuevo siniestro N°123",
             },
-            # ...
+            {
+                "id": "demo2",
+                "fecha": "2025-12-15T14:20:00",
+                "remitente": "cliente2@ejemplo.cl",
+                "asunto": "Consulta cobertura siniestro N°456",
+            },
         ]
 
     nuevos: list[dict] = []
     historicos: list[dict] = []
+    ahora = dt.utcnow()
 
-    ahora = datetime.utcnow()
+    # Clasificaciones guardadas en BD
+    clasificados = obtener_todos_clasificados()
+
     for idx, m in enumerate(mails_base):
         fecha_str = m.get("fecha", "")
         try:
-            fecha_dt = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+            fecha_dt = dt.fromisoformat(fecha_str.replace("Z", "+00:00"))
         except Exception:
             fecha_dt = None
 
@@ -851,34 +862,25 @@ async def pagina_siniestros(request: Request):
         remitente = m.get("remitente", "")
         asunto = m.get("asunto", "")
 
-        if fecha_dt:
-            clave = f'{fecha_dt.strftime("%Y-%m-%d %H:%M")} - {asunto} ({remitente})'
-        else:
-            clave = f"{fecha_str} - {asunto} ({remitente})"
-
-        numero_guardado = CLASIF_SINIESTROS_MAIL.get(clave)
-
+        # Buscar número guardado en BD
+        numero_guardado = clasificados.get(mail_id)
 
         registro = {
             "id": mail_id,
             "fecha": fecha_str,
             "fecha_mostrar": fecha_dt.strftime("%Y-%m-%d %H:%M") if fecha_dt else fecha_str,
-            "remitente": m.get("remitente", ""),
-            "asunto": m.get("asunto", ""),
-            "n_siniestro": numero_guardado,  # puede ser None
+            "remitente": remitente,
+            "asunto": asunto,
+            "n_siniestro": numero_guardado,
         }
 
-        if diff_dias is not None and diff_dias <= 10:
+        if diff_dias is not None and diff_dias <= 7:
             nuevos.append(registro)
         else:
             historicos.append(registro)
 
-    agrupado: dict[str, list[dict]] = {}
-    for m in nuevos + historicos:
-        numero = m.get("n_siniestro")
-        if not numero:
-            continue
-        agrupado.setdefault(numero, []).append(m)
+    # Obtener siniestros agrupados de BD
+    agrupado = obtener_clasificados_agrupados()
 
     return templates.TemplateResponse(
         "siniestros.html",
@@ -890,6 +892,7 @@ async def pagina_siniestros(request: Request):
             "agrupado": agrupado,
         },
     )
+
 
 from fastapi import HTTPException
 
@@ -909,49 +912,52 @@ async def ver_mail_siniestros(request: Request, mail_id: str):
 
 @app.post("/siniestros")
 async def clasificar_siniestros(request: Request):
+    """Guarda clasificaciones de siniestros en BD"""
     form = await request.form()
     origen = form.get("origen", "")
 
-    global CLASIF_SINIESTROS_MAIL
-
-    # Nuevos
+    # Procesar nuevos
     if origen == "nuevos":
         idx = 0
         while f"id_nuevo_{idx}" in form:
+            mail_id = form.get(f"id_nuevo_{idx}", "").strip()
             numero = form.get(f"siniestro_nuevo_{idx}", "").strip()
             fecha = form.get(f"fecha_nuevo_{idx}", "").strip()
             remitente = form.get(f"remitente_nuevo_{idx}", "").strip()
             asunto = form.get(f"asunto_nuevo_{idx}", "").strip()
 
-            clave = f"{fecha} - {asunto} ({remitente})"
-
-            if numero:
-                CLASIF_SINIESTROS_MAIL[clave] = numero
-            else:
-                CLASIF_SINIESTROS_MAIL.pop(clave, None)
-
+            if mail_id:
+                guardar_clasificacion_siniestro(
+                    mail_id=mail_id,
+                    numero_siniestro=numero,
+                    remitente=remitente,
+                    asunto=asunto,
+                    fecha_mail=fecha
+                )
             idx += 1
 
-    # Históricos
+    # Procesar históricos
     elif origen == "historicos":
         idx = 0
         while f"id_historico_{idx}" in form:
+            mail_id = form.get(f"id_historico_{idx}", "").strip()
             numero = form.get(f"siniestro_historico_{idx}", "").strip()
             fecha = form.get(f"fecha_historico_{idx}", "").strip()
             remitente = form.get(f"remitente_historico_{idx}", "").strip()
             asunto = form.get(f"asunto_historico_{idx}", "").strip()
 
-            clave = f"{fecha} - {asunto} ({remitente})"
-
-            if numero:
-                CLASIF_SINIESTROS_MAIL[clave] = numero
-            else:
-                CLASIF_SINIESTROS_MAIL.pop(clave, None)
-
+            if mail_id:
+                guardar_clasificacion_siniestro(
+                    mail_id=mail_id,
+                    numero_siniestro=numero,
+                    remitente=remitente,
+                    asunto=asunto,
+                    fecha_mail=fecha
+                )
             idx += 1
 
-    guardar_clasificacion_siniestros(CLASIF_SINIESTROS_MAIL)
     return RedirectResponse(url="/siniestros", status_code=303)
+
 
 
 @app.get("/siniestros/clasificar", response_class=HTMLResponse)
