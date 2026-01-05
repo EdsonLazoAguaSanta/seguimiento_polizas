@@ -3,207 +3,711 @@
 {% block title %}Siniestros{% endblock %}
 
 {% block content %}
-<h1>Siniestros</h1>
+<div class="siniestros-container">
+  <h1>Gestión de Siniestros</h1>
 
-{% if mododemo %}
-  <p><strong>Modo demo</strong>: No se pudieron leer correos reales, se muestran ejemplos.</p>
-{% endif %}
-
-<details open>
-  <summary><strong>Nuevos</strong> ({{ nuevos|length }})</summary>
-
-  <h2>Nuevos (últimos días)</h2>
-
-  {% if nuevos %}
-    <form method="post" action="{{ url_for('clasificar_siniestros') }}">
-      <input type="hidden" name="origen" value="nuevos">
-
-      <table class="tabla-siniestros">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Remitente</th>
-            <th>Asunto</th>
-            <th>N° de siniestro</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for m in nuevos %}
-            <tr>
-              <td>{{ m.fechamostrar }}</td>
-              <td>{{ m.remitente }}</td>
-              <td>
-                <a href="{{ url_for('ver_mail_siniestros', mail_id=m.id) }}" target="_blank">
-                  {{ m.asunto }}
-                </a>
-
-              </td>
-              <td>
-                {# valores que se envían al backend #}
-                <input type="hidden" name="id_nuevo_{{ loop.index0 }}" value="{{ m.id }}">
-                <input type="hidden" name="fecha_nuevo_{{ loop.index0 }}" value="{{ m.fechamostrar }}">
-                <input type="hidden" name="remitente_nuevo_{{ loop.index0 }}" value="{{ m.remitente }}">
-                <input type="hidden" name="asunto_nuevo_{{ loop.index0 }}" value="{{ m.asunto }}">
-
-                {# valor REAL que se envía al backend #}
-                <input type="hidden"
-                       name="siniestro_nuevo_{{ loop.index0 }}"
-                       id="siniestro_nuevo_{{ loop.index0 }}_hidden"
-                       value="{{ m.nsiniestro or '' }}">
-
-                {# campo visible, bloqueado hasta hacer clic en el lápiz #}
-                <input type="text"
-                       id="siniestro_nuevo_{{ loop.index0 }}"
-                       value="{{ m.nsiniestro or '' }}"
-                       class="input-siniestro{% if not m.nsiniestro %} editable{% endif %}"
-                       {% if not m.nsiniestro %}{% else %}readonly{% endif %}>
-              </td>
-              <td>
-                <button type="button"
-                        class="btn-lapiz"
-                        onclick="habilitarEdicion('{{ loop.index0 }}')"
-                        title="Editar clasificación">
-                  ✎
-                </button>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-
-      <button type="submit">Guardar clasificación de nuevos</button>
-    </form>
-  {% else %}
-    <p>No hay correos nuevos en los últimos 7 días.</p>
+  {% if modo_demo %}
+    <div class="alert alert-warning">
+      <strong>⚠️ Modo Demo:</strong> No se pudieron leer correos reales de Exchange. Se muestran ejemplos de demostración.
+    </div>
   {% endif %}
-</details>
 
-<details>
-  <summary><strong>Históricos</strong> ({{ historicos|length }})</summary>
-
-  <h2>Históricos</h2>
-
-  {% if historicos %}
-    <form method="post" action="{{ url_for('clasificar_siniestros') }}">
-      <input type="hidden" name="origen" value="historicos">
-
-      <table class="tabla-siniestros">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Remitente</th>
-            <th>Asunto</th>
-            <th>N° de siniestro</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for m in historicos %}
-            <tr>
-              <td>{{ m.fechamostrar }}</td>
-              <td>{{ m.remitente }}</td>
-              <td>
-                <a href="{{ url_for('ver_mail_siniestros', mail_id=m.id) }}" target="_blank">
-                  {{ m.asunto }}
-                </a>
-              </td>
-              <td>
-                <input type="hidden" name="id_historico_{{ loop.index0 }}" value="{{ m.id }}">
-                <input type="hidden" name="fecha_historico_{{ loop.index0 }}" value="{{ m.fechamostrar }}">
-                <input type="hidden" name="remitente_historico_{{ loop.index0 }}" value="{{ m.remitente }}">
-                <input type="hidden" name="asunto_historico_{{ loop.index0 }}" value="{{ m.asunto }}">
-
-                {% if m.nsiniestro %}
-                  {{ m.nsiniestro }}
-                {% else %}
-                  <input type="text"
-                         name="siniestro_historico_{{ loop.index0 }}"
-                         value=""
-                         style="width: 140px;">
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-
-      <button type="submit">Guardar clasificación de históricos</button>
-    </form>
-  {% else %}
-    <p>No hay correos históricos.</p>
-  {% endif %}
-</details>
-
-<hr>
-
-<h2>Resumen de siniestros</h2>
-
-{% if agrupado %}
-  {% for numero, lista in agrupado.items() %}
-    <details>
-      <summary>
-        <strong>Siniestro N° {{ numero }}</strong> ({{ lista|length }})
+  <!-- SECCIÓN: CORREOS NUEVOS -->
+  <section class="siniestros-section">
+    <details open>
+      <summary class="section-title">
+        <strong>📬 Nuevos</strong> 
+        <span class="badge">{{ nuevos|length }}</span>
       </summary>
-      <ul>
-        {% for c in lista %}
-          <li>
-            {{ c.fechamostrar }} –
-            <a href="{{ url_for('ver_mail_siniestros', mail_id=c.id) }}" target="_blank">
-              {{ c.asunto }}
-            </a>
-            – {{ c.remitente }}
-          </li>
-        {% endfor %}
-      </ul>
-    </details>
-  {% endfor %}
-{% else %}
-  <p>Aún no hay siniestros clasificados.</p>
-{% endif %}
 
+      {% if nuevos %}
+        <form method="post" action="{{ url_for('clasificar_siniestros') }}" class="form-siniestros">
+          <input type="hidden" name="origen" value="nuevos">
+
+          <div class="form-info">
+            <p>Correos de los últimos 7 días. Edita el número de siniestro haciendo clic en el lápiz.</p>
+          </div>
+
+          <table class="tabla-siniestros">
+            <thead>
+              <tr>
+                <th class="col-fecha">Fecha</th>
+                <th class="col-remitente">Remitente</th>
+                <th class="col-asunto">Asunto</th>
+                <th class="col-numero">N° de Siniestro</th>
+                <th class="col-accion">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in nuevos %}
+                <tr class="fila-nuevo">
+                  <td class="celda-fecha">{{ m.fecha_mostrar }}</td>
+                  <td class="celda-remitente">{{ m.remitente }}</td>
+                  <td class="celda-asunto">
+                    <a href="{{ url_for('ver_mail_siniestros', mail_id=m.id) }}" 
+                       target="_blank" 
+                       class="link-mail"
+                       title="Ver correo completo">
+                      {{ m.asunto }}
+                    </a>
+                  </td>
+                  <td class="celda-numero">
+                    <!-- Input visible (el que ve el usuario) -->
+                    <input 
+                      type="text"
+                      class="input-siniestro"
+                      id="visible_nuevo_{{ loop.index0 }}"
+                      data-idx="{{ loop.index0 }}"
+                      data-tipo="nuevo"
+                      value="{{ m.n_siniestro or '' }}"
+                      {% if m.n_siniestro %}readonly{% endif %}
+                      placeholder="Ej: 10125000000312">
+
+                    <!-- Input hidden que se envía al backend -->
+                    <input 
+                      type="hidden"
+                      name="siniestro_nuevo_{{ loop.index0 }}"
+                      id="hidden_nuevo_{{ loop.index0 }}"
+                      value="{{ m.n_siniestro or '' }}">
+
+                    <!-- Campos adicionales para armado de clave -->
+                    <input type="hidden" name="id_nuevo_{{ loop.index0 }}" value="{{ m.id }}">
+                    <input type="hidden" name="fecha_nuevo_{{ loop.index0 }}" value="{{ m.fecha_mostrar }}">
+                    <input type="hidden" name="remitente_nuevo_{{ loop.index0 }}" value="{{ m.remitente }}">
+                    <input type="hidden" name="asunto_nuevo_{{ loop.index0 }}" value="{{ m.asunto }}">
+                  </td>
+                  <td class="celda-accion">
+                    <button 
+                      type="button"
+                      class="btn-editar"
+                      data-idx="{{ loop.index0 }}"
+                      data-tipo="nuevo"
+                      title="Editar número de siniestro"
+                      onclick="habilitarEdicion(this)">
+                      ✎ Editar
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              💾 Guardar Clasificación de Nuevos
+            </button>
+            <span class="form-hint">Se guardarán {{ nuevos|length }} registros</span>
+          </div>
+        </form>
+      {% else %}
+        <div class="empty-state">
+          <p>📭 No hay correos nuevos en los últimos 7 días.</p>
+        </div>
+      {% endif %}
+    </details>
+  </section>
+
+  <!-- SECCIÓN: CORREOS HISTÓRICOS -->
+  <section class="siniestros-section">
+    <details>
+      <summary class="section-title">
+        <strong>📋 Históricos</strong> 
+        <span class="badge">{{ historicos|length }}</span>
+      </summary>
+
+      {% if historicos %}
+        <form method="post" action="{{ url_for('clasificar_siniestros') }}" class="form-siniestros">
+          <input type="hidden" name="origen" value="historicos">
+
+          <div class="form-info">
+            <p>Correos anteriores a 7 días. Completa los números que falten.</p>
+          </div>
+
+          <table class="tabla-siniestros">
+            <thead>
+              <tr>
+                <th class="col-fecha">Fecha</th>
+                <th class="col-remitente">Remitente</th>
+                <th class="col-asunto">Asunto</th>
+                <th class="col-numero">N° de Siniestro</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in historicos %}
+                <tr class="fila-historico {% if not m.n_siniestro %}sin-clasificar{% endif %}">
+                  <td class="celda-fecha">{{ m.fecha_mostrar }}</td>
+                  <td class="celda-remitente">{{ m.remitente }}</td>
+                  <td class="celda-asunto">
+                    <a href="{{ url_for('ver_mail_siniestros', mail_id=m.id) }}" 
+                       target="_blank" 
+                       class="link-mail"
+                       title="Ver correo completo">
+                      {{ m.asunto }}
+                    </a>
+                  </td>
+                  <td class="celda-numero">
+                    {% if m.n_siniestro %}
+                      <!-- Si ya tiene número, muestra como texto pero con opción de editar -->
+                      <div class="numero-fijo">
+                        <input 
+                          type="hidden"
+                          name="siniestro_historico_{{ loop.index0 }}"
+                          value="{{ m.n_siniestro }}">
+                        <input type="hidden" name="id_historico_{{ loop.index0 }}" value="{{ m.id }}">
+                        <input type="hidden" name="fecha_historico_{{ loop.index0 }}" value="{{ m.fecha_mostrar }}">
+                        <input type="hidden" name="remitente_historico_{{ loop.index0 }}" value="{{ m.remitente }}">
+                        <input type="hidden" name="asunto_historico_{{ loop.index0 }}" value="{{ m.asunto }}">
+                        <span class="badge-numero">{{ m.n_siniestro }}</span>
+                      </div>
+                    {% else %}
+                      <!-- Si no tiene número, muestra input para completar -->
+                      <div class="numero-editable">
+                        <input 
+                          type="text"
+                          class="input-siniestro"
+                          name="siniestro_historico_{{ loop.index0 }}"
+                          id="historico_{{ loop.index0 }}"
+                          placeholder="Ingresar número"
+                          value="">
+                        <input type="hidden" name="id_historico_{{ loop.index0 }}" value="{{ m.id }}">
+                        <input type="hidden" name="fecha_historico_{{ loop.index0 }}" value="{{ m.fecha_mostrar }}">
+                        <input type="hidden" name="remitente_historico_{{ loop.index0 }}" value="{{ m.remitente }}">
+                        <input type="hidden" name="asunto_historico_{{ loop.index0 }}" value="{{ m.asunto }}">
+                      </div>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              💾 Guardar Clasificación de Históricos
+            </button>
+            <span class="form-hint">Sin clasificar: {{ historicos|selectattr('n_siniestro', 'none')|list|length }}</span>
+          </div>
+        </form>
+      {% else %}
+        <div class="empty-state">
+          <p>📭 No hay correos históricos.</p>
+        </div>
+      {% endif %}
+    </details>
+  </section>
+
+  <!-- SECCIÓN: RESUMEN DE SINIESTROS CLASIFICADOS -->
+  <section class="siniestros-section">
+    <h2>📊 Resumen de Siniestros Clasificados</h2>
+
+    {% if agrupado %}
+      <div class="resumen-siniestros">
+        {% for numero, lista in agrupado.items() %}
+          <details class="card-siniestro">
+            <summary class="card-titulo">
+              <strong>Siniestro N° {{ numero }}</strong>
+              <span class="badge badge-info">{{ lista|length }} correo{{ 's' if lista|length != 1 else '' }}</span>
+            </summary>
+            <div class="card-contenido">
+              <ul class="lista-correos">
+                {% for c in lista %}
+                  <li class="item-correo">
+                    <div class="item-fecha">{{ c.fecha_mostrar }}</div>
+                    <div class="item-asunto">
+                      <a href="{{ url_for('ver_mail_siniestros', mail_id=c.id) }}" 
+                         target="_blank"
+                         class="link-mail">
+                        {{ c.asunto }}
+                      </a>
+                    </div>
+                    <div class="item-remitente">{{ c.remitente }}</div>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <p>📭 Aún no hay siniestros clasificados. Completa los números arriba.</p>
+      </div>
+    {% endif %}
+  </section>
+
+</div>
+
+<!-- ESTILOS CSS -->
 <style>
-  .btn-lapiz {
-    background: none;
-    border: none;
+  /* ===== CONTENEDOR PRINCIPAL ===== */
+  .siniestros-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-color: #f9f9f9;
+  }
+
+  .siniestros-container h1 {
+    color: #333;
+    border-bottom: 3px solid #0066cc;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+  }
+
+  /* ===== ALERTAS ===== */
+  .alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    border-left: 4px solid;
+  }
+
+  .alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+    color: #856404;
+  }
+
+  /* ===== SECCIONES ===== */
+  .siniestros-section {
+    background: white;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+
+  .siniestros-section details {
     padding: 0;
+  }
+
+  .siniestros-section summary {
     cursor: pointer;
-    font-size: 18px;
-    line-height: 1;
+    padding: 15px 20px;
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+    user-select: none;
+    transition: background-color 0.2s;
   }
-  .btn-lapiz:focus {
-    outline: none;
+
+  .siniestros-section summary:hover {
+    background-color: #ececec;
   }
-  .input-siniestro {
-    background-color: #f3f3f3;
-    border: 1px solid #ccc;
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
   }
-  .input-siniestro.editable {
-    background-color: #ffffff;
+
+  /* ===== BADGES ===== */
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background-color: #0066cc;
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
   }
+
+  .badge-info {
+    background-color: #17a2b8;
+  }
+
+  .badge-numero {
+    display: inline-block;
+    padding: 6px 12px;
+    background-color: #28a745;
+    color: white;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  /* ===== TABLAS ===== */
   .tabla-siniestros {
     width: 100%;
     border-collapse: collapse;
+    padding: 20px;
   }
-  .tabla-siniestros th,
+
+  .tabla-siniestros thead {
+    background-color: #f5f5f5;
+  }
+
+  .tabla-siniestros th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #ddd;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
   .tabla-siniestros td {
-    padding: 4px 8px;
-    border-bottom: 1px solid #ddd;
+    padding: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    vertical-align: middle;
+  }
+
+  .tabla-siniestros tbody tr:hover {
+    background-color: #fafafa;
+  }
+
+  /* Columnas */
+  .col-fecha { width: 140px; }
+  .col-remitente { width: 180px; }
+  .col-asunto { flex: 1; }
+  .col-numero { width: 200px; }
+  .col-accion { width: 100px; }
+
+  .celda-fecha {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .celda-remitente {
+    font-size: 12px;
+    color: #666;
+    word-break: break-word;
+  }
+
+  .celda-asunto {
+    color: #333;
+  }
+
+  .link-mail {
+    color: #0066cc;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .link-mail:hover {
+    color: #0052a3;
+    border-bottom-color: #0052a3;
+  }
+
+  /* ===== INPUTS DE SINIESTRO ===== */
+  .input-siniestro {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    background-color: #f9f9f9;
+    color: #333;
+    transition: all 0.2s;
+  }
+
+  .input-siniestro:focus {
+    outline: none;
+    border-color: #0066cc;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+  }
+
+  .input-siniestro[readonly] {
+    background-color: #f0f0f0;
+    color: #555;
+    cursor: not-allowed;
+  }
+
+  /* ===== BOTONES ===== */
+  .btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background-color: #0066cc;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background-color: #0052a3;
+    box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3);
+  }
+
+  .btn-primary:active {
+    background-color: #003d7a;
+  }
+
+  .btn-editar {
+    padding: 6px 12px;
+    background-color: #e8f4f8;
+    color: #0066cc;
+    border: 1px solid #0066cc;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-editar:hover {
+    background-color: #0066cc;
+    color: white;
+  }
+
+  .btn-editar:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.2);
+  }
+
+  /* ===== FORM INFO ===== */
+  .form-info {
+    padding: 12px 20px;
+    background-color: #e8f4f8;
+    border-left: 4px solid #0066cc;
+    margin-bottom: 15px;
+    color: #004085;
+    font-size: 13px;
+  }
+
+  .form-actions {
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .form-hint {
+    font-size: 12px;
+    color: #999;
+  }
+
+  /* ===== ESTADOS VACÍOS ===== */
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: #999;
+    font-size: 15px;
+  }
+
+  /* ===== RESUMEN DE SINIESTROS ===== */
+  .resumen-siniestros {
+    padding: 20px;
+    display: grid;
+    gap: 15px;
+  }
+
+  .card-siniestro {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: white;
+  }
+
+  .card-titulo {
+    cursor: pointer;
+    padding: 15px;
+    background-color: #f5f5f5;
+    border-bottom: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s;
+  }
+
+  .card-titulo:hover {
+    background-color: #ececec;
+  }
+
+  .card-contenido {
+    padding: 15px;
+  }
+
+  .lista-correos {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .item-correo {
+    padding: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    display: grid;
+    gap: 6px;
+  }
+
+  .item-correo:last-child {
+    border-bottom: none;
+  }
+
+  .item-fecha {
+    font-size: 12px;
+    color: #999;
+    font-family: 'Courier New', monospace;
+  }
+
+  .item-asunto {
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+  }
+
+  .item-remitente {
+    font-size: 12px;
+    color: #666;
+  }
+
+  /* ===== ESTADOS DE FILAS ===== */
+  .fila-nuevo {
+    background-color: #f0f7ff;
+  }
+
+  .fila-historico {
+    background-color: white;
+  }
+
+  .fila-historico.sin-clasificar {
+    background-color: #fff8f0;
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    .siniestros-container {
+      padding: 10px;
+    }
+
+    .tabla-siniestros {
+      font-size: 12px;
+    }
+
+    .tabla-siniestros th,
+    .tabla-siniestros td {
+      padding: 8px;
+    }
+
+    .col-fecha { width: 100px; }
+    .col-remitente { width: 120px; }
+    .col-numero { width: 140px; }
+    .col-accion { width: 80px; }
+
+    .form-actions {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .section-title {
+      font-size: 14px;
+    }
   }
 </style>
 
+<!-- JAVASCRIPT -->
 <script>
-  function habilitarEdicion(idx) {
-    const visible = document.getElementById('siniestro_nuevo_' + idx);
-    const hidden = document.getElementById('siniestro_nuevo_' + idx + '_hidden');
+  /**
+   * Habilita la edición de un campo de siniestro
+   * @param {HTMLElement} btnElement - El botón que disparó la acción
+   */
+  function habilitarEdicion(btnElement) {
+    const idx = btnElement.dataset.idx;
+    const tipo = btnElement.dataset.tipo;
 
-    if (visible && hidden) {
-      visible.readOnly = false;
-      visible.classList.add('editable');
-      visible.focus();
-      visible.addEventListener('input', function () {
-        hidden.value = visible.value;
-      });
+    const visibleId = `visible_${tipo}_${idx}`;
+    const hiddenId = `hidden_${tipo}_${idx}`;
+
+    const inputVisible = document.getElementById(visibleId);
+    const inputHidden = document.getElementById(hiddenId);
+
+    if (!inputVisible || !inputHidden) {
+      console.error(`No se encontraron inputs para idx=${idx}, tipo=${tipo}`);
+      return;
     }
+
+    // Habilitar edición
+    inputVisible.removeAttribute('readonly');
+    inputVisible.classList.add('editable');
+    inputVisible.focus();
+    inputVisible.select();
+
+    // Cambiar apariencia del botón
+    btnElement.textContent = '✓ Guardar';
+    btnElement.classList.add('btn-activo');
+
+    // Sincronizar en tiempo real
+    const sincronizar = () => {
+      inputHidden.value = inputVisible.value.trim();
+    };
+
+    inputVisible.addEventListener('input', sincronizar);
+    inputVisible.addEventListener('change', sincronizar);
+
+    // Permitir guardar con Enter
+    inputVisible.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        sincronizar();
+        inputVisible.setAttribute('readonly', '');
+        inputVisible.classList.remove('editable');
+        btnElement.textContent = '✎ Editar';
+        btnElement.classList.remove('btn-activo');
+      }
+    });
+
+    // Permitir cancelar con Escape
+    inputVisible.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        inputVisible.value = inputHidden.value;
+        inputVisible.setAttribute('readonly', '');
+        inputVisible.classList.remove('editable');
+        btnElement.textContent = '✎ Editar';
+        btnElement.classList.remove('btn-activo');
+      }
+    });
+
+    // Sincronizar al perder el foco
+    inputVisible.addEventListener('blur', () => {
+      sincronizar();
+      inputVisible.setAttribute('readonly', '');
+      inputVisible.classList.remove('editable');
+      btnElement.textContent = '✎ Editar';
+      btnElement.classList.remove('btn-activo');
+    });
   }
+
+  // Validación básica antes de enviar
+  document.querySelectorAll('form.form-siniestros').forEach(form => {
+    form.addEventListener('submit', (e) => {
+      const siniestrosVacios = [];
+      
+      form.querySelectorAll('input[type="hidden"][name^="siniestro_"]').forEach(input => {
+        if (!input.value.trim()) {
+          siniestrosVacios.push(input.id);
+        }
+      });
+
+      if (siniestrosVacios.length > 0) {
+        console.warn(`Existen ${siniestrosVacios.length} siniestros sin número`);
+      }
+    });
+  });
+
+  // Log de inicialización
+  console.log('✓ Script de siniestros cargado correctamente');
 </script>
-{% endblock %}
+
+  {% endblock %}
